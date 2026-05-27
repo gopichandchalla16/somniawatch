@@ -1,0 +1,62 @@
+:root {
+  --bg-primary:  #080810;
+  --bg-card:     #10101E;
+  --bg-panel:    #14141F;
+  --bg-input:    #1A1A2E;
+  --color-safe:  #00FF88;
+  --color-warn:  #FFD700;
+  --color-crit:  #FF4444;
+  --color-agent: #7C6FFF;
+  --color-text:  #E8E8F0;
+  --color-muted: #6B6B90;
+  --border:      #1E1E3A;
+  --radius:      12px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background:  var(--bg-primary);
+  color:       var(--color-text);
+  font-family: 'Inter', sans-serif;
+  min-height:  100vh;
+  line-height: 1.6;
+}
+
+code, .mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--color-agent); border-radius: 3px; }
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-8px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* Interactions */
+button:hover    { opacity: 0.85; transition: opacity 0.15s; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+input:focus     { border-color: var(--color-agent) !important; outline: none; }
+
+.glow {
+  box-shadow: 0 0 20px rgba(124, 111, 255, 0.3);
+}
+
+.slide-in {
+  animation: slideIn 0.2s ease-out;
+}
