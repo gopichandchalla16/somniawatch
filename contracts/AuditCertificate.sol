@@ -4,25 +4,25 @@ pragma solidity ^0.8.20;
 /// @title  AuditCertificate
 /// @notice On-chain NFT security certificate issued to smart contracts
 ///         that achieve consecutive SAFE audits via SomniaWatch
-/// @author Gopichand Challa — Somnia Agentathon 2026
+/// @author Gopichand Challa - Somnia Agentathon 2026
 ///
-/// @dev Soulbound NFT (non-transferable) — represents verified security status.
+/// @dev Soulbound NFT (non-transferable) - represents verified security status.
 ///      Only SomniaWatch contract can mint/revoke certificates.
-///      Metadata is fully on-chain — no IPFS dependency.
+///      Metadata is fully on-chain - no IPFS dependency.
 ///
 ///      Certificate levels:
-///        Bronze  — 3  consecutive SAFE audits
-///        Silver  — 7  consecutive SAFE audits
-///        Gold    — 15 consecutive SAFE audits
+///        Bronze  - 3  consecutive SAFE audits
+///        Silver  - 7  consecutive SAFE audits
+///        Gold    - 15 consecutive SAFE audits
 ///
 ///      When a contract is flagged CRITICAL by SomniaWatch agents,
-///      its certificate is automatically REVOKED — no human needed.
+///      its certificate is automatically REVOKED - no human needed.
 
 contract AuditCertificate {
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  TYPES
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     enum CertLevel { BRONZE, SILVER, GOLD }
 
@@ -36,16 +36,16 @@ contract AuditCertificate {
         bool       isRevoked;
     }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  STATE
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     uint256 public nextTokenId = 1;
 
-    mapping(uint256  => Certificate) public certificates;    // tokenId → cert
-    mapping(address  => uint256)     public contractToToken; // contract → tokenId
-    mapping(uint256  => address)     public tokenOwner;      // tokenId → owner
-    mapping(address  => uint256[])   public ownerTokens;     // owner → tokenIds
+    mapping(uint256  => Certificate) public certificates;    // tokenId => cert
+    mapping(address  => uint256)     public contractToToken; // contract => tokenId
+    mapping(uint256  => address)     public tokenOwner;      // tokenId => owner
+    mapping(address  => uint256[])   public ownerTokens;     // owner => tokenIds
 
     address public somniaWatch;  // Only SomniaWatch can mint/revoke
     address public admin;
@@ -55,26 +55,26 @@ contract AuditCertificate {
     uint256 public constant SILVER_THRESHOLD = 7;
     uint256 public constant GOLD_THRESHOLD   = 15;
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  EVENTS
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     event CertificateMinted  (uint256 indexed tokenId, address indexed contractAddr, CertLevel level, uint256 receipt);
     event CertificateRevoked (uint256 indexed tokenId, address indexed contractAddr, uint256 receipt);
     event CertificateUpgraded(uint256 indexed tokenId, CertLevel newLevel);
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  CONSTRUCTOR
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     constructor(address _somniaWatch) {
         somniaWatch = _somniaWatch;
         admin       = msg.sender;
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  MINTING — only SomniaWatch can call
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
+    //  MINTING - only SomniaWatch can call
+    // ================================================================
 
     /// @notice Mint a security certificate NFT for a verified-safe contract
     /// @param contractAddr   The smart contract that passed audits
@@ -153,9 +153,9 @@ contract AuditCertificate {
         emit CertificateRevoked(tokenId, contractAddr, agentReceipt);
     }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  ON-CHAIN SVG METADATA
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     /// @notice Generate full on-chain SVG metadata for a certificate
     function tokenURI(uint256 tokenId)
@@ -174,7 +174,7 @@ contract AuditCertificate {
             '<rect width="400" height="220" fill="#080810" rx="16"/>',
             '<rect x="1" y="1" width="398" height="218" fill="none" stroke="', levelColor, '" stroke-width="2" rx="15" opacity="0.6"/>',
             '<circle cx="200" cy="45" r="25" fill="', levelColor, '" opacity="0.15"/>',
-            '<text x="200" y="52" text-anchor="middle" font-size="24">🛡️</text>',
+            '<text x="200" y="52" text-anchor="middle" font-size="24">[Shield]</text>',
             '<text x="200" y="90" text-anchor="middle" font-family="monospace" font-size="14" font-weight="bold" fill="', levelColor, '">',
             levelName, ' SECURITY CERTIFICATE</text>',
             '<text x="200" y="112" text-anchor="middle" font-family="monospace" font-size="9" fill="#6B6B90">',
@@ -187,7 +187,7 @@ contract AuditCertificate {
             '<text x="200" y="177" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="', statusColor, '">',
             status, '</text>',
             '<text x="200" y="208" text-anchor="middle" font-family="monospace" font-size="8" fill="#3A3A5A">',
-            'SomniaWatch Agentathon 2026 • Consensus-Validated AI Security</text>',
+            'SomniaWatch Agentathon 2026 - Consensus-Validated AI Security</text>',
             '</svg>'
         ));
 
@@ -209,9 +209,9 @@ contract AuditCertificate {
         ));
     }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  VIEWS
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     function getCertificate(address contractAddr)
         external view returns (Certificate memory)
@@ -236,18 +236,18 @@ contract AuditCertificate {
         return nextTokenId - 1;
     }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  ADMIN
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     function updateSomniaWatch(address newWatch) external {
         require(msg.sender == admin, "Admin only");
         somniaWatch = newWatch;
     }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  INTERNAL HELPERS
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     function _getLevel(uint256 count) internal pure returns (CertLevel) {
         if (count >= GOLD_THRESHOLD)   return CertLevel.GOLD;

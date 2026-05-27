@@ -5,21 +5,21 @@ import "./interfaces/ISomniaAgents.sol";
 
 /// @title  SomniaWatch
 /// @notice Autonomous smart contract security guardian on Somnia Agentic L1
-/// @author Gopichand Challa — Somnia Agentathon 2026
+/// @author Gopichand Challa - Somnia Agentathon 2026
 ///
 /// @dev TWO-AGENT PIPELINE (fully on-chain, no human in the loop):
 ///
 ///   triggerMonitor(address)
-///     └─► JSON API Agent (ID: 13174292974160097713)
+///     => JSON API Agent (ID: 13174292974160097713)
 ///           Fetches tx history from Somnia explorer API
-///           3 validators reach consensus → callback fires
-///     └─► handleTxDataResponse()
+///           3 validators reach consensus => callback fires
+///     => handleTxDataResponse()
 ///           Chains immediately to:
-///     └─► LLM Inference Agent (ID: 12847293847561029384, Qwen3-30B)
+///     => LLM Inference Agent (ID: 12847293847561029384, Qwen3-30B)
 ///           allowedValues: ["safe","suspicious","critical"]
-///           OUTPUT IS FORCED — no JSON parsing needed in Solidity
-///           3 validators reach consensus → callback fires
-///     └─► handleClassificationResponse()
+///           OUTPUT IS FORCED - no JSON parsing needed in Solidity
+///           3 validators reach consensus => callback fires
+///     => handleClassificationResponse()
 ///           Stores AuditRecord with receiptId = agent requestId
 ///           Auto-flags contract if CRITICAL
 ///
@@ -28,16 +28,16 @@ import "./interfaces/ISomniaAgents.sol";
 
 contract SomniaWatch {
 
-    // ════════════════════════════════════════════════════════════════
-    //  PLATFORM — verified from agents.somnia.network
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
+    //  PLATFORM - verified from agents.somnia.network
+    // ================================================================
 
     /// @notice Somnia Agent Platform contract
     IAgentRequester public immutable platform;
 
-    // ════════════════════════════════════════════════════════════════
-    //  AGENT CONFIG — all values from agents.somnia.network
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
+    //  AGENT CONFIG - all values from agents.somnia.network
+    // ================================================================
 
     /// @notice JSON API Request Agent ID
     uint256 public constant JSON_AGENT_ID = 13174292974160097713;
@@ -61,9 +61,9 @@ contract SomniaWatch {
     string public explorerApiBase =
         "https://shannon-explorer.somnia.network/api/v2/addresses/";
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  ENUMS
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     /// @notice Risk classification returned by LLM agent
     enum RiskLevel { SAFE, SUSPICIOUS, CRITICAL }
@@ -71,9 +71,9 @@ contract SomniaWatch {
     /// @notice Tracks which agent step a pending request is waiting for
     enum CheckStage { AWAITING_TX_DATA, AWAITING_CLASSIFICATION }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  STRUCTS
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     /// @notice Profile of a registered contract under monitoring
     struct ContractProfile {
@@ -87,7 +87,7 @@ contract SomniaWatch {
     }
 
     /// @notice Immutable audit record stored after each monitoring cycle
-    /// @dev receiptId equals the Somnia agent requestId — verifiable on-chain proof
+    /// @dev receiptId equals the Somnia agent requestId - verifiable on-chain proof
     struct AuditRecord {
         address   target;
         RiskLevel riskLevel;
@@ -105,9 +105,9 @@ contract SomniaWatch {
         string     txSnapshot;
     }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  STATE
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     mapping(address => ContractProfile) public  registry;
     mapping(address => AuditRecord[])   public  auditHistory;
@@ -117,9 +117,9 @@ contract SomniaWatch {
     uint256   public totalAuditsCompleted;
     address   public watchAdmin;
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  EVENTS
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     event ContractRegistered (address indexed target, address indexed owner);
     event MonitorTriggered   (address indexed target, uint256 requestId, uint256 deposit);
@@ -130,9 +130,9 @@ contract SomniaWatch {
     event AgentCallFailed    (address indexed target, uint256 requestId, string reason);
     event Funded             (address indexed by, uint256 amount);
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  CONSTRUCTOR
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     /// @param _platform 0x5E5205CF39E766118C01636bED000A54D93163E6
     constructor(address _platform) {
@@ -141,9 +141,9 @@ contract SomniaWatch {
         watchAdmin = msg.sender;
     }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  REGISTRATION
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     /// @notice Register a smart contract for autonomous monitoring
     /// @param target Address of the contract to monitor
@@ -166,10 +166,10 @@ contract SomniaWatch {
         emit ContractRegistered(target, msg.sender);
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  STEP 1 — TRIGGER MONITORING
+    // ================================================================
+    //  STEP 1 - TRIGGER MONITORING
     //  Sends request to JSON API Agent to fetch recent transactions
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     /// @notice Trigger a monitoring cycle for a registered contract
     /// @dev Contract must hold enough SOMI or caller must send msg.value.
@@ -209,7 +209,7 @@ contract SomniaWatch {
             "items"
         );
 
-        // Send request to Somnia platform — callback: handleTxDataResponse
+        // Send request to Somnia platform - callback: handleTxDataResponse
         requestId = platform.createRequest{value: deposit}(
             JSON_AGENT_ID,
             address(this),
@@ -236,11 +236,11 @@ contract SomniaWatch {
         emit MonitorTriggered(target, requestId, deposit);
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  STEP 2 — JSON API CALLBACK
+    // ================================================================
+    //  STEP 2 - JSON API CALLBACK
     //  Called by platform when 3 validators reach consensus on tx data
     //  Immediately chains to LLM Inference Agent
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     /// @notice Callback from Somnia JSON API Agent
     /// @dev ONLY callable by the platform contract.
@@ -272,10 +272,10 @@ contract SomniaWatch {
         // Decode the transaction data string from consensus result
         string memory txData = abi.decode(responses[0].result, (string));
 
-        // ── Build LLM Prompt ─────────────────────────────────────────
+        // Build LLM Prompt
         // Using Qwen3-30B via Somnia's LLM Inference Agent.
         // allowedValues FORCES output to be exactly one of our 3 strings.
-        // This eliminates ALL JSON parsing in Solidity — direct keccak256 compare.
+        // This eliminates ALL JSON parsing in Solidity - direct keccak256 compare.
 
         string memory userPrompt = string(abi.encodePacked(
             "You are analyzing recent blockchain transaction data from a monitored "
@@ -297,7 +297,7 @@ contract SomniaWatch {
             "Be precise: safe means no anomalies detected, suspicious means unusual but "
             "not confirmed attack, critical means clear evidence of an attack pattern.";
 
-        // allowedValues array — constrains LLM to return ONLY one of these strings
+        // allowedValues array - constrains LLM to return ONLY one of these strings
         string[] memory allowedValues = new string[](3);
         allowedValues[0] = "safe";
         allowedValues[1] = "suspicious";
@@ -321,7 +321,7 @@ contract SomniaWatch {
             "Insufficient SOMI for LLM step: call fund() to top up contract balance"
         );
 
-        // Send LLM request — callback: handleClassificationResponse
+        // Send LLM request - callback: handleClassificationResponse
         uint256 llmReqId = platform.createRequest{value: llmDeposit}(
             LLM_AGENT_ID,
             address(this),
@@ -342,17 +342,17 @@ contract SomniaWatch {
         emit TxDataReceived(target, requestId, llmReqId);
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  STEP 3 — LLM CALLBACK
+    // ================================================================
+    //  STEP 3 - LLM CALLBACK
     //  Called by platform when 3 validators reach consensus on classification
-    //  This is the autonomous decision point — no human involved
-    // ════════════════════════════════════════════════════════════════
+    //  This is the autonomous decision point - no human involved
+    // ================================================================
 
     /// @notice Callback from Somnia LLM Inference Agent (Qwen3-30B)
     /// @dev ONLY callable by the platform contract.
     ///      The riskStr result is GUARANTEED to be "safe", "suspicious", or "critical"
     ///      because allowedValues was set in the agent request.
-    ///      No JSON parsing needed — direct keccak256 string comparison only.
+    ///      No JSON parsing needed - direct keccak256 string comparison only.
     function handleClassificationResponse(
         uint256        requestId,
         Response[]     memory responses,
@@ -367,10 +367,10 @@ contract SomniaWatch {
         address target     = pc.target;
         string  memory txSS = pc.txSnapshot;
 
-        // Handle agent failure — store safe record, don't block future checks
+        // Handle agent failure - store safe record, don't block future checks
         if (status != ResponseStatus.Success || responses.length == 0) {
             _storeAudit(target, RiskLevel.SAFE, "unknown",
-                        "Agent unavailable — check retried next cycle",
+                        "Agent unavailable - check retried next cycle",
                         requestId, false);
             emit AgentCallFailed(target, requestId, "llm_failed_or_timeout");
             delete pendingChecks[requestId];
@@ -378,7 +378,7 @@ contract SomniaWatch {
             return;
         }
 
-        // Decode LLM result — GUARANTEED to be "safe", "suspicious", or "critical"
+        // Decode LLM result - GUARANTEED to be "safe", "suspicious", or "critical"
         // because allowedValues was set. No JSON parsing needed anywhere.
         string memory riskStr = abi.decode(responses[0].result, (string));
 
@@ -389,10 +389,10 @@ contract SomniaWatch {
         string memory riskType  = _deriveRiskType(riskLevel, txSS);
         string memory reasoning = _deriveReasoning(riskLevel, riskType);
 
-        // ── Autonomous Action ─────────────────────────────────────────
+        // Autonomous Action
         // If CRITICAL: automatically flag the contract.
         // This decision was made by Qwen3-30B, consensus-validated by 3 validators.
-        // No human decided this — the agent network did.
+        // No human decided this - the agent network did.
         bool autoActioned = false;
 
         if (riskLevel == RiskLevel.CRITICAL && !registry[target].isFlagged) {
@@ -425,9 +425,9 @@ contract SomniaWatch {
         delete pendingChecks[requestId];
     }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  FUNDING & ADMIN
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     /// @notice Fund the contract with SOMI to pay for agent calls
     /// @dev Send at least 5 SOMI to cover ~14 full monitoring cycles (0.36 each)
@@ -456,9 +456,9 @@ contract SomniaWatch {
         explorerApiBase = newBase;
     }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  VIEW FUNCTIONS
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     /// @notice Get full audit history for a monitored contract
     function getAuditHistory(address target)
@@ -503,9 +503,9 @@ contract SomniaWatch {
         return address(this).balance;
     }
 
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
     //  INTERNAL HELPERS
-    // ════════════════════════════════════════════════════════════════
+    // ================================================================
 
     /// @dev Store an audit record in the contract's history
     function _storeAudit(
