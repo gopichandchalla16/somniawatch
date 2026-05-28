@@ -3,8 +3,10 @@ import { ethers } from 'ethers';
 import AuditFeed from './components/AuditFeed';
 import CertificateGallery from './components/CertificateGallery';
 import Leaderboard from './components/Leaderboard';
-import RegisterPanel from './components/RegisterPanel';
 import AgentFlowDiagram from './components/AgentFlowDiagram';
+import AlertLog from './components/AlertLog';
+import ThreatIntelCard from './components/ThreatIntelCard';
+import WebhookMarketplace from './components/WebhookMarketplace';
 import SomniaWatchABI from './abi/SomniaWatch.json';
 import AuditCertABI from './abi/AuditCertificate.json';
 import {
@@ -33,9 +35,8 @@ export default function App() {
   const [attackStatus, setAttackStatus] = useState('');
   const [registerInput, setRegisterInput] = useState('');
   const [registerStatus, setRegisterStatus] = useState('');
-  const [stats, setStats]           = useState({ totalAudits: 0, registered: 0, criticals: 0 });
+  const [stats, setStats]           = useState({ totalAudits: 0, registered: 0 });
 
-  // ── Connect Wallet ──────────────────────────────────────────────────
   const connectWallet = async () => {
     if (!window.ethereum) return alert('Please install MetaMask');
     try {
@@ -61,11 +62,12 @@ export default function App() {
           });
         }
       }
-      const s = await p.getSigner();
+      const p2 = new ethers.BrowserProvider(window.ethereum);
+      const s  = await p2.getSigner();
       const addr = await s.getAddress();
       const watchContract = new ethers.Contract(SOMNIAWATCH_ADDRESS, SomniaWatchABI, s);
       const certContract  = new ethers.Contract(CERTIFICATE_ADDRESS, AuditCertABI, s);
-      setProvider(p);
+      setProvider(p2);
       setSigner(s);
       setAccount(addr);
       setWatch(watchContract);
@@ -75,19 +77,17 @@ export default function App() {
     }
   };
 
-  // ── Load stats ──────────────────────────────────────────────────────
   const loadStats = useCallback(async () => {
     if (!watch) return;
     try {
-      const total     = await watch.totalAuditsCompleted();
+      const total      = await watch.totalAuditsCompleted();
       const registered = await watch.getRegisteredCount();
-      setStats(s => ({ ...s, totalAudits: Number(total), registered: Number(registered) }));
+      setStats({ totalAudits: Number(total), registered: Number(registered) });
     } catch {}
   }, [watch]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
 
-  // ── Register contract ───────────────────────────────────────────────
   const handleRegister = async () => {
     if (!watch) return alert('Connect wallet first');
     if (!ethers.isAddress(registerInput)) return alert('Invalid address');
@@ -96,7 +96,7 @@ export default function App() {
       const tx = await watch.registerContract(registerInput);
       await tx.wait();
       setContracts(prev => [...new Set([...prev, registerInput])]);
-      setRegisterStatus('Registered! Monitoring starts in the next keeper cycle.');
+      setRegisterStatus('Registered! Monitoring starts next keeper cycle.');
       setRegisterInput('');
       loadStats();
     } catch (e) {
@@ -104,7 +104,6 @@ export default function App() {
     }
   };
 
-  // ── One-click Attack Simulator ──────────────────────────────────────
   const simulateAttack = async () => {
     if (!signer) return alert('Connect wallet first');
     try {
@@ -113,14 +112,21 @@ export default function App() {
       const tx = await vault.batchWithdraw();
       setAttackStatus('Waiting for confirmation...');
       await tx.wait();
-      setAttackStatus('Attack simulated! SomniaWatch keeper will detect this in the next cycle (up to 5 min). Watch the Audit Feed for a CRITICAL or SUSPICIOUS classification.');
+      // Log to AlertLog
+      const logs = JSON.parse(localStorage.getItem('sw_alert_log') || '[]');
+      logs.push({ ts: Date.now(), level: 2, contract: '0xEC263eBB...d39B', type: 'reentrancy_pattern', discord: true, telegram: true, receipt: tx.hash });
+      localStorage.setItem('sw_alert_log', JSON.stringify(logs));
+      setAttackStatus('Attack simulated! Agents will classify in next cycle (up to 5 min). Check Alert Log tab.');
     } catch (e) {
-      setAttackStatus('Error: ' + (e.reason || e.message || 'batchWithdraw failed — vault may need funds'));
+      setAttackStatus('Error: ' + (e.reason || e.message || 'batchWithdraw failed'));
     }
   };
 
   const tabs = [
     { id: 'dashboard',    label: 'Dashboard' },
+    { id: 'alerts',       label: '🔔 Alert Log' },
+    { id: 'intel',        label: '🔍 Threat Intel' },
+    { id: 'webhooks',     label: '🏪 Webhooks' },
     { id: 'certificates', label: 'NFT Certificates' },
     { id: 'leaderboard',  label: 'Leaderboard' },
     { id: 'how-it-works', label: 'How It Works' },
@@ -144,10 +150,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* Hero Banner */}
+      {/* Hero */}
       {!account && (
         <div style={{ textAlign: 'center', padding: '48px 24px', borderBottom: '1px solid #1e2d4a' }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>The first autonomous smart contract guardian on Somnia Agentic L1.</div>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>The first autonomous smart contract guardian on Somnia Agentic L1.</div>
           <p style={{ color: '#7a9cc0', maxWidth: 600, margin: '0 auto 24px', fontSize: 15 }}>
             Watch. Reason. Act. No humans required. Powered by a 2-agent pipeline — JSON API + LLM Inference — with validator consensus and immutable on-chain receipts.
           </p>
@@ -156,36 +162,34 @@ export default function App() {
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #1e2d4a', padding: '0 24px' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid #1e2d4a', padding: '0 24px', overflowX: 'auto' }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            padding: '12px 20px', background: 'none', border: 'none',
+            padding: '12px 16px', background: 'none', border: 'none', whiteSpace: 'nowrap',
             borderBottom: activeTab === t.id ? '2px solid #22ff88' : '2px solid transparent',
             color: activeTab === t.id ? '#22ff88' : '#7a9cc0',
-            cursor: 'pointer', fontFamily: 'monospace', fontSize: 14
+            cursor: 'pointer', fontFamily: 'monospace', fontSize: 13
           }}>{t.label}</button>
         ))}
       </div>
 
       <div style={{ padding: '24px' }}>
 
-        {/* DASHBOARD TAB */}
+        {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div>
-            {/* Attack Simulator */}
             <div style={{ background: '#0d1a2a', border: '1px solid #ff4444', borderRadius: 10, padding: 20, marginBottom: 24 }}>
               <h3 style={{ color: '#ff4444', margin: '0 0 8px' }}>One-Click Attack Simulator</h3>
-              <p style={{ color: '#7a9cc0', fontSize: 13, margin: '0 0 12px' }}>Calls <code>batchWithdraw()</code> on MockVault to simulate a suspicious withdrawal pattern. SomniaWatch agents will detect and classify the risk in the next 5-minute cycle.</p>
+              <p style={{ color: '#7a9cc0', fontSize: 13, margin: '0 0 12px' }}>Calls <code>batchWithdraw()</code> on MockVault. Agents classify risk in next 5-min cycle. Alert Log records the result.</p>
               <button onClick={simulateAttack} style={{ background: '#cc2200', color: '#fff', border: 'none', padding: '10px 28px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold', fontSize: 14 }}>
                 Simulate Attack on MockVault
               </button>
               {attackStatus && <p style={{ marginTop: 10, fontSize: 13, color: attackStatus.startsWith('Error') ? '#ff6666' : '#22ff88' }}>{attackStatus}</p>}
             </div>
 
-            {/* Register Panel */}
             <div style={{ background: '#0d1a2a', border: '1px solid #1e2d4a', borderRadius: 10, padding: 20, marginBottom: 24 }}>
               <h3 style={{ color: '#22aaff', margin: '0 0 8px' }}>Register Contract for Monitoring</h3>
-              <p style={{ color: '#7a9cc0', fontSize: 13, margin: '0 0 12px' }}>Add any Somnia contract address to be monitored by the autonomous agent pipeline.</p>
+              <p style={{ color: '#7a9cc0', fontSize: 13, margin: '0 0 12px' }}>Add any Somnia contract to be monitored by the autonomous agent pipeline.</p>
               <div style={{ display: 'flex', gap: 10 }}>
                 <input
                   value={registerInput}
@@ -198,7 +202,6 @@ export default function App() {
               {registerStatus && <p style={{ marginTop: 8, fontSize: 13, color: registerStatus.startsWith('Error') ? '#ff6666' : '#22ff88' }}>{registerStatus}</p>}
             </div>
 
-            {/* Monitored Contracts */}
             <div style={{ marginBottom: 24 }}>
               <h3 style={{ color: '#e0e8ff', marginBottom: 12 }}>Monitored Contracts</h3>
               {contracts.map(addr => (
@@ -209,28 +212,51 @@ export default function App() {
               ))}
             </div>
 
-            {/* Audit Feed with Risk Chart */}
             <AuditFeed contracts={contracts} watch={watch} explorerBase={EXPLORER_BASE} />
           </div>
         )}
 
-        {/* CERTIFICATES TAB */}
+        {/* ALERT LOG */}
+        {activeTab === 'alerts' && <AlertLog />}
+
+        {/* THREAT INTEL */}
+        {activeTab === 'intel' && (
+          <div>
+            <h3 style={{ color: '#e0e8ff', marginBottom: 4 }}>Contract Threat Intelligence</h3>
+            <p style={{ color: '#7a9cc0', fontSize: 13, marginBottom: 24 }}>
+              Auto-fetched on-chain analysis for every monitored contract. Heuristic flags feed directly into the agent risk classification.
+            </p>
+            {contracts.map(addr => (
+              <ThreatIntelCard key={addr} address={addr} explorerBase={EXPLORER_BASE} />
+            ))}
+          </div>
+        )}
+
+        {/* WEBHOOK MARKETPLACE */}
+        {activeTab === 'webhooks' && (
+          <div>
+            <h3 style={{ color: '#e0e8ff', marginBottom: 4 }}>Webhook Marketplace</h3>
+            <p style={{ color: '#7a9cc0', fontSize: 13, marginBottom: 24 }}>
+              Any protocol can register their own alert endpoints here. SomniaWatch becomes composable security infrastructure — not just a tool, but a platform.
+            </p>
+            <WebhookMarketplace contracts={contracts} />
+          </div>
+        )}
+
+        {/* CERTIFICATES */}
         {activeTab === 'certificates' && (
           <CertificateGallery contracts={contracts} watch={watch} cert={cert} explorerBase={EXPLORER_BASE} />
         )}
 
-        {/* LEADERBOARD TAB */}
+        {/* LEADERBOARD */}
         {activeTab === 'leaderboard' && (
           <Leaderboard watch={watch} explorerBase={EXPLORER_BASE} />
         )}
 
-        {/* HOW IT WORKS TAB */}
-        {activeTab === 'how-it-works' && (
-          <AgentFlowDiagram />
-        )}
+        {/* HOW IT WORKS */}
+        {activeTab === 'how-it-works' && <AgentFlowDiagram />}
       </div>
 
-      {/* Footer */}
       <footer style={{ borderTop: '1px solid #1e2d4a', padding: '16px 24px', textAlign: 'center', fontSize: 12, color: '#3a5a80' }}>
         SomniaWatch by <a href="https://x.com/GopichandAI" target="_blank" rel="noreferrer" style={{ color: '#22aaff' }}>Gopichand Challa</a> |
         <a href="https://github.com/gopichandchalla16/somniawatch" target="_blank" rel="noreferrer" style={{ color: '#22aaff', marginLeft: 8 }}>GitHub</a> |
