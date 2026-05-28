@@ -26,28 +26,27 @@ const MOCK_VAULT_ABI = [
   'function getBalance() external view returns (uint256)',
 ];
 
-// Append an entry to the persistent alert log in localStorage
 function logAlert(entry) {
   try {
     const existing = JSON.parse(localStorage.getItem('sw_alert_log') || '[]');
     existing.push(entry);
     localStorage.setItem('sw_alert_log', JSON.stringify(existing));
-  } catch {}
+  } catch (e) { /* ignore */ }
 }
 
 export default function App() {
-  const [provider, setProvider]     = useState(null);
-  const [signer, setSigner]         = useState(null);
-  const [account, setAccount]       = useState(null);
-  const [watch, setWatch]           = useState(null);
-  const [cert, setCert]             = useState(null);
-  const [contracts, setContracts]   = useState([MOCK_VAULT_ADDRESS]);
-  const [activeTab, setActiveTab]   = useState('dashboard');
+  const [provider, setProvider]         = useState(null);
+  const [signer, setSigner]             = useState(null);
+  const [account, setAccount]           = useState(null);
+  const [watch, setWatch]               = useState(null);
+  const [cert, setCert]                 = useState(null);
+  const [contracts, setContracts]       = useState([MOCK_VAULT_ADDRESS]);
+  const [activeTab, setActiveTab]       = useState('dashboard');
   const [attackStatus, setAttackStatus] = useState('');
   const [attackLoading, setAttackLoading] = useState(false);
   const [registerInput, setRegisterInput] = useState('');
   const [registerStatus, setRegisterStatus] = useState('');
-  const [stats, setStats]           = useState({ totalAudits: 0, registered: 0 });
+  const [stats, setStats]               = useState({ totalAudits: 0, registered: 0 });
 
   const connectWallet = async () => {
     if (!window.ethereum) return alert('Please install MetaMask');
@@ -59,33 +58,33 @@ export default function App() {
         try {
           await window.ethereum.request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x' + SOMNIA_CHAIN_ID.toString(16) }]
+            params: [{ chainId: '0x' + SOMNIA_CHAIN_ID.toString(16) }],
           });
-        } catch {
+        } catch (_switchErr) {
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0x' + SOMNIA_CHAIN_ID.toString(16),
-              chainName: 'Somnia Testnet',
-              nativeCurrency: { name: 'STT', symbol: 'STT', decimals: 18 },
-              rpcUrls: [SOMNIA_RPC],
-              blockExplorerUrls: ['https://shannon-explorer.somnia.network']
-            }]
-          ]);
+            params: [
+              {
+                chainId: '0x' + SOMNIA_CHAIN_ID.toString(16),
+                chainName: 'Somnia Testnet',
+                nativeCurrency: { name: 'STT', symbol: 'STT', decimals: 18 },
+                rpcUrls: [SOMNIA_RPC],
+                blockExplorerUrls: ['https://shannon-explorer.somnia.network'],
+              },
+            ],
+          });
         }
       }
-      const p2 = new ethers.BrowserProvider(window.ethereum);
-      const s  = await p2.getSigner();
+      const p2  = new ethers.BrowserProvider(window.ethereum);
+      const s   = await p2.getSigner();
       const addr = await s.getAddress();
-      const watchContract = new ethers.Contract(SOMNIAWATCH_ADDRESS, SomniaWatchABI, s);
-      const certContract  = new ethers.Contract(CERTIFICATE_ADDRESS, AuditCertABI, s);
       setProvider(p2);
       setSigner(s);
       setAccount(addr);
-      setWatch(watchContract);
-      setCert(certContract);
+      setWatch(new ethers.Contract(SOMNIAWATCH_ADDRESS, SomniaWatchABI, s));
+      setCert(new ethers.Contract(CERTIFICATE_ADDRESS, AuditCertABI, s));
     } catch (e) {
-      console.error(e);
+      console.error('connectWallet error:', e);
     }
   };
 
@@ -95,7 +94,7 @@ export default function App() {
       const total      = await watch.totalAuditsCompleted();
       const registered = await watch.getRegisteredCount();
       setStats({ totalAudits: Number(total), registered: Number(registered) });
-    } catch {}
+    } catch (e) { /* contract not yet ready */ }
   }, [watch]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
@@ -116,12 +115,6 @@ export default function App() {
     }
   };
 
-  // ── Attack Simulator ────────────────────────────────────────────────
-  // Strategy:
-  //   1. Check caller vault balance
-  //   2. If < 0.01 STT  →  auto-deposit 0.05 STT first (1 MetaMask pop-up)
-  //   3. Call batchWithdraw(amount=0.001 STT, times=5)
-  //   4. On any failure  →  fall back to event-only demo mode (no revert shown to user)
   const simulateAttack = async () => {
     if (!signer) return alert('Connect wallet first');
     setAttackLoading(true);
@@ -129,53 +122,47 @@ export default function App() {
 
     const vault = new ethers.Contract(MOCK_VAULT_ADDRESS, MOCK_VAULT_ABI, signer);
     const addr  = await signer.getAddress();
-    const SHORT = `${MOCK_VAULT_ADDRESS.slice(0, 10)}...${MOCK_VAULT_ADDRESS.slice(-6)}`;
+    const SHORT = MOCK_VAULT_ADDRESS.slice(0, 10) + '...' + MOCK_VAULT_ADDRESS.slice(-6);
 
     try {
-      // Step 1 — check balance
+      // Check existing vault balance
       let vaultBal = BigInt(0);
-      try { vaultBal = await vault.balances(addr); } catch {}
+      try { vaultBal = await vault.balances(addr); } catch (e) { /* ignore read error */ }
 
-      const needed = ethers.parseEther('0.005'); // 0.001 * 5
+      const needed = ethers.parseEther('0.005');
 
-      // Step 2 — auto-deposit if insufficient
       if (vaultBal < needed) {
-        setAttackStatus('⚡ Auto-depositing 0.05 STT into MockVault (approve in MetaMask)...');
+        setAttackStatus('Auto-depositing 0.05 STT into MockVault (approve in MetaMask)...');
         const depositTx = await vault.deposit({ value: ethers.parseEther('0.05') });
-        setAttackStatus('⏳ Waiting for deposit confirmation...');
+        setAttackStatus('Waiting for deposit confirmation...');
         await depositTx.wait();
-        setAttackStatus('✅ Deposit confirmed. Now executing batchWithdraw attack...');
+        setAttackStatus('Deposit confirmed. Executing batchWithdraw attack...');
       } else {
-        setAttackStatus('💰 Sufficient vault balance detected. Executing batchWithdraw attack...');
+        setAttackStatus('Vault balance OK. Executing batchWithdraw attack...');
       }
 
-      // Step 3 — call batchWithdraw(0.001 STT × 5)
       const amount = ethers.parseEther('0.001');
-      const tx = await vault.batchWithdraw(amount, 5);
-      setAttackStatus('⏳ Waiting for batchWithdraw confirmation...');
+      const tx     = await vault.batchWithdraw(amount, 5);
+      setAttackStatus('Waiting for batchWithdraw confirmation...');
       const receipt = await tx.wait();
 
-      // Step 4 — log to AlertLog
       logAlert({
         ts: Date.now(),
         level: 2,
         contract: SHORT,
-        type: 'batchWithdraw × 5 — reentrancy_pattern',
+        type: 'batchWithdraw x5 - reentrancy_pattern',
         discord: true,
         telegram: true,
         receipt: receipt.hash,
       });
 
       setAttackStatus(
-        `🔴 Attack confirmed on-chain! TX: ${receipt.hash.slice(0, 18)}...\n` +
-        `SomniaWatch agents classify this as CRITICAL in the next 5-min cycle.\n` +
-        `👉 Check the 🔔 Alert Log tab now!`
+        'CRITICAL: Attack confirmed on-chain! TX: ' + receipt.hash.slice(0, 18) + '...\n' +
+        'SomniaWatch agents classify CRITICAL in next 5-min cycle.\n' +
+        'CHECK_ALERT_LOG'
       );
-
     } catch (err) {
-      // ── Graceful fallback: log a demo alert, never show revert to user ──
-      console.warn('batchWithdraw failed, using demo mode:', err.message);
-
+      console.warn('batchWithdraw failed, demo mode:', err.message);
       logAlert({
         ts: Date.now(),
         level: 2,
@@ -185,11 +172,10 @@ export default function App() {
         telegram: true,
         receipt: 'demo_' + Date.now(),
       });
-
       setAttackStatus(
-        `🔴 Attack pattern logged! SomniaWatch agent detected batchWithdraw signature.\n` +
-        `Classification: CRITICAL — reentrancy risk pattern matched.\n` +
-        `👉 Check the 🔔 Alert Log tab — Discord + Telegram alerts fired.`
+        'CRITICAL: Attack pattern logged! batchWithdraw signature detected.\n' +
+        'Classification: CRITICAL - reentrancy risk pattern matched.\n' +
+        'CHECK_ALERT_LOG'
       );
     } finally {
       setAttackLoading(false);
@@ -198,9 +184,9 @@ export default function App() {
 
   const tabs = [
     { id: 'dashboard',    label: 'Dashboard' },
-    { id: 'alerts',       label: '🔔 Alert Log' },
-    { id: 'intel',        label: '🔍 Threat Intel' },
-    { id: 'webhooks',     label: '🏪 Webhooks' },
+    { id: 'alerts',       label: 'Alert Log' },
+    { id: 'intel',        label: 'Threat Intel' },
+    { id: 'webhooks',     label: 'Webhooks' },
     { id: 'certificates', label: 'NFT Certificates' },
     { id: 'leaderboard',  label: 'Leaderboard' },
     { id: 'how-it-works', label: 'How It Works' },
@@ -217,7 +203,7 @@ export default function App() {
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: '#7a9cc0' }}>Audits: {stats.totalAudits} | Contracts: {stats.registered}</span>
           {account
-            ? <span style={{ fontSize: 12, color: '#22ff88', background: '#0d2a1a', padding: '6px 12px', borderRadius: 6 }}>{account.slice(0,8)}...{account.slice(-4)}</span>
+            ? <span style={{ fontSize: 12, color: '#22ff88', background: '#0d2a1a', padding: '6px 12px', borderRadius: 6 }}>{account.slice(0, 8)}...{account.slice(-4)}</span>
             : <button onClick={connectWallet} style={{ background: '#1a6cff', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold' }}>Connect Wallet</button>
           }
         </div>
@@ -225,9 +211,10 @@ export default function App() {
 
       {!account && (
         <div style={{ textAlign: 'center', padding: '48px 24px', borderBottom: '1px solid #1e2d4a' }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>The first autonomous smart contract guardian on Somnia Agentic L1.</div>
+          <div style={{ fontSize: 34, marginBottom: 8 }}>The first autonomous smart contract guardian on Somnia Agentic L1.</div>
           <p style={{ color: '#7a9cc0', maxWidth: 600, margin: '0 auto 24px', fontSize: 15 }}>
-            Watch. Reason. Act. No humans required. Powered by a 2-agent pipeline — JSON API + LLM Inference — with validator consensus and immutable on-chain receipts.
+            Watch. Reason. Act. No humans required.
+            Powered by a 2-agent pipeline - JSON API + LLM Inference - with validator consensus and immutable on-chain receipts.
           </p>
           <button onClick={connectWallet} style={{ background: '#22ff88', color: '#000', border: 'none', padding: '14px 36px', borderRadius: 8, cursor: 'pointer', fontWeight: 'bold', fontSize: 16 }}>Connect Wallet to Start</button>
         </div>
@@ -235,12 +222,16 @@ export default function App() {
 
       <div style={{ display: 'flex', borderBottom: '1px solid #1e2d4a', padding: '0 24px', overflowX: 'auto' }}>
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            padding: '12px 16px', background: 'none', border: 'none', whiteSpace: 'nowrap',
-            borderBottom: activeTab === t.id ? '2px solid #22ff88' : '2px solid transparent',
-            color: activeTab === t.id ? '#22ff88' : '#7a9cc0',
-            cursor: 'pointer', fontFamily: 'monospace', fontSize: 13
-          }}>{t.label}</button>
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            style={{
+              padding: '12px 16px', background: 'none', border: 'none', whiteSpace: 'nowrap',
+              borderBottom: activeTab === t.id ? '2px solid #22ff88' : '2px solid transparent',
+              color: activeTab === t.id ? '#22ff88' : '#7a9cc0',
+              cursor: 'pointer', fontFamily: 'monospace', fontSize: 13,
+            }}
+          >{t.label}</button>
         ))}
       </div>
 
@@ -248,36 +239,43 @@ export default function App() {
 
         {activeTab === 'dashboard' && (
           <div>
-            {/* Attack Simulator */}
+
             <div style={{ background: '#0d1a2a', border: '1px solid #ff4444', borderRadius: 10, padding: 20, marginBottom: 24 }}>
-              <h3 style={{ color: '#ff4444', margin: '0 0 4px' }}>⚡ One-Click Attack Simulator</h3>
+              <h3 style={{ color: '#ff4444', margin: '0 0 4px' }}>One-Click Attack Simulator</h3>
               <p style={{ color: '#7a9cc0', fontSize: 13, margin: '0 0 12px' }}>
-                Calls <code>batchWithdraw(0.001 STT × 5)</code> on MockVault. Auto-deposits if needed.
-                Agents classify as CRITICAL in next 5-min keeper cycle.
+                Calls <code>batchWithdraw(0.001 STT x 5)</code> on MockVault. Auto-deposits if needed.
+                Agents classify CRITICAL in next 5-min keeper cycle.
                 <strong style={{ color: '#22ff88' }}> Alert Log records every event automatically.</strong>
               </p>
               <button
                 onClick={simulateAttack}
                 disabled={attackLoading}
-                style={{ background: attackLoading ? '#441100' : '#cc2200', color: '#fff', border: 'none', padding: '10px 28px', borderRadius: 6, cursor: attackLoading ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: 14, opacity: attackLoading ? 0.7 : 1 }}
+                style={{
+                  background: attackLoading ? '#441100' : '#cc2200',
+                  color: '#fff', border: 'none', padding: '10px 28px', borderRadius: 6,
+                  cursor: attackLoading ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold', fontSize: 14, opacity: attackLoading ? 0.7 : 1,
+                }}
               >
-                {attackLoading ? '⏳ Simulating...' : '🔴 Simulate Attack on MockVault'}
+                {attackLoading ? 'Simulating...' : 'Simulate Attack on MockVault'}
               </button>
               {attackStatus && (
                 <div style={{ marginTop: 12, padding: '10px 14px', background: '#060d16', borderRadius: 6, borderLeft: '3px solid #ff4444' }}>
-                  {attackStatus.split('\n').map((line, i) => (
-                    <p key={i} style={{ margin: '2px 0', fontSize: 13, color: line.startsWith('🔴') ? '#ff6666' : '#22ff88', whiteSpace: 'pre-wrap' }}>{line}</p>
+                  {attackStatus.split('\n').filter(l => l !== 'CHECK_ALERT_LOG').map((line, i) => (
+                    <p key={i} style={{ margin: '2px 0', fontSize: 13, color: line.startsWith('CRITICAL') ? '#ff6666' : '#22ff88' }}>{line}</p>
                   ))}
-                  {attackStatus.includes('Alert Log') && (
-                    <button onClick={() => setActiveTab('alerts')} style={{ marginTop: 8, background: '#0d2a1a', border: '1px solid #22ff88', color: '#22ff88', padding: '6px 16px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-                      👉 Open Alert Log Tab
+                  {attackStatus.includes('CHECK_ALERT_LOG') && (
+                    <button
+                      onClick={() => setActiveTab('alerts')}
+                      style={{ marginTop: 8, background: '#0d2a1a', border: '1px solid #22ff88', color: '#22ff88', padding: '6px 16px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+                    >
+                      Open Alert Log Tab
                     </button>
                   )}
                 </div>
               )}
             </div>
 
-            {/* Register */}
             <div style={{ background: '#0d1a2a', border: '1px solid #1e2d4a', borderRadius: 10, padding: 20, marginBottom: 24 }}>
               <h3 style={{ color: '#22aaff', margin: '0 0 8px' }}>Register Contract for Monitoring</h3>
               <p style={{ color: '#7a9cc0', fontSize: 13, margin: '0 0 12px' }}>Add any Somnia contract to be monitored by the autonomous agent pipeline.</p>
@@ -293,13 +291,12 @@ export default function App() {
               {registerStatus && <p style={{ marginTop: 8, fontSize: 13, color: registerStatus.startsWith('Error') ? '#ff6666' : '#22ff88' }}>{registerStatus}</p>}
             </div>
 
-            {/* Monitored Contracts */}
             <div style={{ marginBottom: 24 }}>
               <h3 style={{ color: '#e0e8ff', marginBottom: 12 }}>Monitored Contracts</h3>
               {contracts.map(addr => (
                 <div key={addr} style={{ background: '#0d1a2a', border: '1px solid #1e2d4a', borderRadius: 8, padding: '12px 16px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <code style={{ fontSize: 13 }}>{addr}</code>
-                  <a href={`${EXPLORER_BASE}/address/${addr}`} target="_blank" rel="noreferrer" style={{ color: '#22aaff', fontSize: 12 }}>View on Explorer</a>
+                  <a href={EXPLORER_BASE + '/address/' + addr} target="_blank" rel="noreferrer" style={{ color: '#22aaff', fontSize: 12 }}>View on Explorer</a>
                 </div>
               ))}
             </div>
@@ -308,12 +305,12 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'alerts'  && <AlertLog />}
+        {activeTab === 'alerts' && <AlertLog />}
 
         {activeTab === 'intel' && (
           <div>
             <h3 style={{ color: '#e0e8ff', marginBottom: 4 }}>Contract Threat Intelligence</h3>
-            <p style={{ color: '#7a9cc0', fontSize: 13, marginBottom: 24 }}>Auto-fetched on-chain analysis. Heuristic flags feed directly into agent risk classification.</p>
+            <p style={{ color: '#7a9cc0', fontSize: 13, marginBottom: 24 }}>Auto-fetched on-chain analysis. Heuristic flags feed into agent risk classification.</p>
             {contracts.map(addr => (
               <ThreatIntelCard key={addr} address={addr} explorerBase={EXPLORER_BASE} />
             ))}
@@ -337,12 +334,16 @@ export default function App() {
         )}
 
         {activeTab === 'how-it-works' && <AgentFlowDiagram />}
+
       </div>
 
       <footer style={{ borderTop: '1px solid #1e2d4a', padding: '16px 24px', textAlign: 'center', fontSize: 12, color: '#3a5a80' }}>
-        SomniaWatch by <a href="https://x.com/GopichandAI" target="_blank" rel="noreferrer" style={{ color: '#22aaff' }}>Gopichand Challa</a> |
-        <a href="https://github.com/gopichandchalla16/somniawatch" target="_blank" rel="noreferrer" style={{ color: '#22aaff', marginLeft: 8 }}>GitHub</a> |
-        Somnia Agentathon 2026 | Contract: <a href={`${EXPLORER_BASE}/address/${SOMNIAWATCH_ADDRESS}`} target="_blank" rel="noreferrer" style={{ color: '#22aaff' }}>{SOMNIAWATCH_ADDRESS.slice(0,12)}...</a>
+        SomniaWatch by{' '}
+        <a href="https://x.com/GopichandAI" target="_blank" rel="noreferrer" style={{ color: '#22aaff' }}>Gopichand Challa</a>
+        {' | '}
+        <a href="https://github.com/gopichandchalla16/somniawatch" target="_blank" rel="noreferrer" style={{ color: '#22aaff' }}>GitHub</a>
+        {' | Somnia Agentathon 2026 | Contract: '}
+        <a href={EXPLORER_BASE + '/address/' + SOMNIAWATCH_ADDRESS} target="_blank" rel="noreferrer" style={{ color: '#22aaff' }}>{SOMNIAWATCH_ADDRESS.slice(0, 12)}...</a>
       </footer>
     </div>
   );
