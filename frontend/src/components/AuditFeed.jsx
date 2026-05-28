@@ -1,151 +1,141 @@
-import { RISK_COLORS, RISK_BG, RISK_ICONS, RISK_LABELS, RISK_BORDER, TIME_AGO, EXPLORER_TX } from "../constants";
+import React, { useState, useEffect, useCallback } from 'react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-export default function AuditFeed({ contracts, totalAudits }) {
-  // Flatten all audits across all contracts, sort by timestamp desc
-  const allAudits = contracts
-    .flatMap((c) => c.history.map((h) => ({ ...h, contractAddr: c.address })))
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, 20);
+const RISK_COLORS = { 0: '#22ff88', 1: '#ffaa00', 2: '#ff4444' };
+const RISK_LABELS = { 0: 'SAFE', 1: 'SUSPICIOUS', 2: 'CRITICAL' };
+const RISK_SCORE  = { 0: 10, 1: 60, 2: 100 };
+
+export default function AuditFeed({ contracts, watch, explorerBase }) {
+  const [histories, setHistories] = useState({});
+  const [loading, setLoading]    = useState(false);
+
+  const loadHistory = useCallback(async () => {
+    if (!watch || !contracts.length) return;
+    setLoading(true);
+    const result = {};
+    for (const addr of contracts) {
+      try {
+        const records = await watch.getAuditHistory(addr);
+        result[addr] = records.map((r, i) => ({
+          index: i + 1,
+          time: new Date(Number(r.timestamp) * 1000).toLocaleTimeString(),
+          risk: RISK_SCORE[Number(r.riskLevel)] || 10,
+          riskLevel: Number(r.riskLevel),
+          riskType: r.riskType,
+          reasoning: r.reasoning,
+          receiptId: r.receiptId?.toString(),
+          autoActioned: r.autoActioned
+        }));
+      } catch {
+        result[addr] = [];
+      }
+    }
+    setHistories(result);
+    setLoading(false);
+  }, [watch, contracts]);
+
+  useEffect(() => {
+    loadHistory();
+    const interval = setInterval(loadHistory, 30000);
+    return () => clearInterval(interval);
+  }, [loadHistory]);
+
+  // Demo data if no on-chain history yet
+  const demoData = [
+    { index: 1, time: 'T-4', risk: 10,  riskLevel: 0 },
+    { index: 2, time: 'T-3', risk: 10,  riskLevel: 0 },
+    { index: 3, time: 'T-2', risk: 60,  riskLevel: 1 },
+    { index: 4, time: 'T-1', risk: 100, riskLevel: 2 },
+    { index: 5, time: 'Now', risk: 10,  riskLevel: 0 },
+  ];
 
   return (
-    <div style={{
-      background:   "var(--bg-card)",
-      border:       "1px solid var(--border)",
-      borderRadius: "var(--radius)",
-      padding:      "24px",
-      marginBottom: "24px",
-    }}>
-      <div style={{
-        display:       "flex",
-        justifyContent:"space-between",
-        alignItems:    "center",
-        marginBottom:  "16px",
-      }}>
-        <div style={{
-          fontFamily:    "JetBrains Mono",
-          fontSize:      "11px",
-          color:         "var(--color-muted)",
-          letterSpacing: "2px",
-          textTransform: "uppercase",
-        }}>
-          Audit Log
-        </div>
-        <div style={{
-          fontFamily: "JetBrains Mono",
-          fontSize:   "12px",
-          color:      "var(--color-agent)",
-        }}>
-          {totalAudits} total on-chain audits
-        </div>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h3 style={{ margin: 0, color: '#e0e8ff' }}>Live Audit Feed + Risk History</h3>
+        <button onClick={loadHistory} style={{ background: '#0d2a3a', border: '1px solid #1e2d4a', color: '#22aaff', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
       </div>
 
-      {allAudits.length === 0 ? (
-        <div style={{
-          color:      "var(--color-muted)",
-          fontFamily: "JetBrains Mono",
-          fontSize:   "13px",
-          padding:    "24px 0",
-          textAlign:  "center",
-        }}>
-          No audits yet. Register a contract and trigger monitoring.
-        </div>
-      ) : (
-        allAudits.map((h, idx) => (
-          <div
-            key={idx}
-            className="slide-in"
-            style={{
-              background:   "var(--bg-panel)",
-              borderLeft:   `3px solid ${RISK_COLORS[h.riskLevel] || "var(--border)"}`,
-              borderRadius: "0 8px 8px 0",
-              padding:      "10px 14px",
-              marginBottom: "8px",
-              display:      "flex",
-              gap:          "10px",
-              alignItems:   "center",
-              flexWrap:     "wrap",
-            }}
-          >
-            <span style={{ fontSize: "16px", flexShrink: 0 }}>{RISK_ICONS[h.riskLevel]}</span>
+      {contracts.map(addr => {
+        const history = histories[addr] || [];
+        const chartData = history.length > 0 ? history : demoData;
+        const latest = history[history.length - 1];
+        const level = latest ? latest.riskLevel : null;
 
-            <span style={{
-              color:      RISK_COLORS[h.riskLevel],
-              fontFamily: "JetBrains Mono",
-              fontWeight: 700,
-              fontSize:   "12px",
-              minWidth:   "80px",
-            }}>
-              {RISK_LABELS[h.riskLevel]}
-            </span>
+        return (
+          <div key={addr} style={{ background: '#0d1a2a', border: `1px solid ${level === 2 ? '#ff4444' : level === 1 ? '#ffaa00' : '#1e2d4a'}`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
+            {/* Contract header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div>
+                <code style={{ fontSize: 13, color: '#7af' }}>{addr.slice(0,10)}...{addr.slice(-6)}</code>
+                {latest && (
+                  <span style={{ marginLeft: 12, fontSize: 13, fontWeight: 'bold', color: RISK_COLORS[level] }}>
+                    {RISK_LABELS[level]}
+                  </span>
+                )}
+                {latest?.autoActioned && <span style={{ marginLeft: 8, fontSize: 11, background: '#3a0000', color: '#ff6666', padding: '2px 8px', borderRadius: 4 }}>AUTO-FLAGGED</span>}
+              </div>
+              <a href={`${explorerBase}/address/${addr}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#22aaff' }}>Explorer</a>
+            </div>
 
-            <span style={{
-              fontFamily: "JetBrains Mono",
-              fontSize:   "11px",
-              color:      "var(--color-muted)",
-            }}>
-              {h.contractAddr.slice(0, 10)}...
-            </span>
+            {/* Risk History Chart */}
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 11, color: '#3a5a80', margin: '0 0 6px' }}>
+                {history.length > 0 ? `${history.length} audit cycles recorded` : 'Demo data — live data loads after first keeper cycle'}
+              </p>
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2d4a" />
+                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#3a5a80' }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#3a5a80' }} />
+                  <Tooltip
+                    contentStyle={{ background: '#0a0f1a', border: '1px solid #1e2d4a', borderRadius: 6 }}
+                    formatter={(val) => [`${val}`, 'Risk Score']}
+                  />
+                  <Line type="monotone" dataKey="risk" stroke="#22ff88" strokeWidth={2} dot={{ fill: '#22ff88', r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
 
-            <span style={{
-              fontFamily: "JetBrains Mono",
-              fontSize:   "11px",
-              color:      "var(--color-text)",
-              background: "var(--bg-input)",
-              borderRadius: "4px",
-              padding:    "2px 6px",
-            }}>
-              {h.riskType}
-            </span>
-
-            <span style={{
-              fontSize: "12px",
-              color:    "var(--color-text)",
-              flex:     1,
-              minWidth: "120px",
-            }}>
-              "{h.reasoning.slice(0, 80)}{h.reasoning.length > 80 ? "..." : ""}"
-            </span>
-
-            {h.autoActioned && (
-              <span style={{
-                background:   "rgba(255,68,68,0.2)",
-                color:        "var(--color-crit)",
-                border:       "1px solid rgba(255,68,68,0.4)",
-                borderRadius: "4px",
-                padding:      "2px 6px",
-                fontSize:     "10px",
-                fontWeight:   700,
-                fontFamily:   "JetBrains Mono",
-                whiteSpace:   "nowrap",
-              }}>
-                AUTO-FLAGGED
-              </span>
+            {/* Latest audit record */}
+            {latest && (
+              <div style={{ background: '#060d16', borderRadius: 6, padding: 12, fontSize: 12 }}>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 6, flexWrap: 'wrap' }}>
+                  <span style={{ color: '#3a5a80' }}>Risk Type: <span style={{ color: '#e0e8ff' }}>{latest.riskType}</span></span>
+                  <span style={{ color: '#3a5a80' }}>Time: <span style={{ color: '#e0e8ff' }}>{latest.time}</span></span>
+                  {latest.receiptId && (
+                    <a href={`${explorerBase}/tx/${latest.receiptId}`} target="_blank" rel="noreferrer" style={{ color: '#22aaff' }}>
+                      Receipt: {latest.receiptId.slice(0,12)}...
+                    </a>
+                  )}
+                </div>
+                <p style={{ color: '#7a9cc0', margin: 0 }}>{latest.reasoning}</p>
+              </div>
             )}
 
-            <a
-              href={EXPLORER_TX(h.receiptId)}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                color:      "var(--color-agent)",
-                fontSize:   "11px",
-                whiteSpace: "nowrap",
-                fontFamily: "JetBrains Mono",
-              }}
-            >
-              on-chain receipt ↗
-            </a>
-
-            <span style={{
-              fontFamily: "JetBrains Mono",
-              fontSize:   "10px",
-              color:      "var(--color-muted)",
-              whiteSpace: "nowrap",
-            }}>
-              {TIME_AGO(h.timestamp)}
-            </span>
+            {/* Full history list */}
+            {history.length > 1 && (
+              <details style={{ marginTop: 12 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#22aaff' }}>Show all {history.length} audit records</summary>
+                <div style={{ marginTop: 8, maxHeight: 200, overflowY: 'auto' }}>
+                  {[...history].reverse().map((r, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 12, padding: '4px 0', borderBottom: '1px solid #0d1a2a', fontSize: 11 }}>
+                      <span style={{ color: RISK_COLORS[r.riskLevel], minWidth: 70 }}>{RISK_LABELS[r.riskLevel]}</span>
+                      <span style={{ color: '#3a5a80' }}>{r.time}</span>
+                      <span style={{ color: '#7a9cc0' }}>{r.riskType}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
           </div>
-        ))
+        );
+      })}
+
+      {contracts.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: '#3a5a80' }}>No contracts registered yet. Add one above.</div>
       )}
     </div>
   );
