@@ -7,6 +7,7 @@ import AgentFlowDiagram from './components/AgentFlowDiagram';
 import AlertLog from './components/AlertLog';
 import ThreatIntelCard from './components/ThreatIntelCard';
 import WebhookMarketplace from './components/WebhookMarketplace';
+import AgentExplorer from './components/AgentExplorer';
 import SomniaWatchABI from './abi/SomniaWatch.json';
 import AuditCertABI from './abi/AuditCertificate.json';
 import {
@@ -36,35 +37,31 @@ function logAlert(entry) {
 
 function getLocalAuditCount() {
   try {
-    // Count from AuditFeed localStorage key
     const keys = Object.keys(localStorage).filter(k => k.startsWith('sw_audits_'));
     let total = 0;
     keys.forEach(k => {
       try { total += JSON.parse(localStorage.getItem(k) || '[]').length; } catch { /* skip */ }
     });
-    // Also count alert log entries as audits
     const alerts = JSON.parse(localStorage.getItem('sw_alert_log') || '[]');
-    // Return whichever is higher
     return Math.max(total, alerts.length);
   } catch { return 0; }
 }
 
 export default function App() {
-  const [provider, setProvider]         = useState(null);
-  const [signer, setSigner]             = useState(null);
-  const [account, setAccount]           = useState(null);
-  const [watch, setWatch]               = useState(null);
-  const [cert, setCert]                 = useState(null);
-  const [contracts, setContracts]       = useState([MOCK_VAULT_ADDRESS]);
-  const [activeTab, setActiveTab]       = useState('dashboard');
-  const [attackStatus, setAttackStatus] = useState('');
+  const [provider, setProvider]           = useState(null);
+  const [signer, setSigner]               = useState(null);
+  const [account, setAccount]             = useState(null);
+  const [watch, setWatch]                 = useState(null);
+  const [cert, setCert]                   = useState(null);
+  const [contracts, setContracts]         = useState([MOCK_VAULT_ADDRESS]);
+  const [activeTab, setActiveTab]         = useState('dashboard');
+  const [attackStatus, setAttackStatus]   = useState('');
   const [attackLoading, setAttackLoading] = useState(false);
   const [registerInput, setRegisterInput] = useState('');
   const [registerStatus, setRegisterStatus] = useState('');
-  const [stats, setStats]               = useState({ totalAudits: 0, registered: 1 });
+  const [stats, setStats]                 = useState({ totalAudits: 0, registered: 1 });
 
   const loadStats = useCallback(async () => {
-    // Always show local audit count — on-chain count only updates when Somnia platform agents complete full cycle
     const localCount = getLocalAuditCount();
     let onChainTotal = 0;
     let onChainRegistered = 1;
@@ -74,7 +71,7 @@ export default function App() {
         const registered = await watch.getRegisteredCount();
         onChainTotal      = Number(total);
         onChainRegistered = Math.max(1, Number(registered));
-      } catch { /* contract not yet ready, use local */ }
+      } catch { /* use local */ }
     }
     setStats({
       totalAudits: Math.max(localCount, onChainTotal),
@@ -82,7 +79,6 @@ export default function App() {
     });
   }, [watch]);
 
-  // Load stats on mount and every 30 seconds
   useEffect(() => {
     loadStats();
     const interval = setInterval(loadStats, 30000);
@@ -162,7 +158,7 @@ export default function App() {
       const receipt = await tx.wait();
       logAlert({ ts: Date.now(), level: 2, contract: SHORT, type: 'batchWithdraw x5 - reentrancy_pattern', discord: true, telegram: true, receipt: receipt.hash });
       setAttackStatus('CRITICAL: Attack confirmed on-chain! TX: ' + receipt.hash.slice(0, 18) + '...\nSomniaWatch agents classify CRITICAL in next 5-min cycle.\nCHECK_ALERT_LOG');
-      setTimeout(loadStats, 1000); // refresh count after logging
+      setTimeout(loadStats, 1000);
     } catch (err) {
       console.warn('batchWithdraw demo mode:', err.message);
       logAlert({ ts: Date.now(), level: 2, contract: SHORT, type: 'batchWithdraw_pattern_detected (demo)', discord: true, telegram: true, receipt: 'demo_' + Date.now() });
@@ -175,6 +171,7 @@ export default function App() {
     { id: 'dashboard',    label: 'Dashboard' },
     { id: 'alerts',       label: 'Alert Log' },
     { id: 'intel',        label: 'Threat Intel' },
+    { id: 'agents',       label: '🤖 Agent Explorer' },
     { id: 'webhooks',     label: 'Webhooks' },
     { id: 'certificates', label: 'NFT Certificates' },
     { id: 'leaderboard',  label: 'Leaderboard' },
@@ -203,9 +200,10 @@ export default function App() {
 
       {!account && (
         <div style={{ textAlign: 'center', padding: '48px 24px', borderBottom: '1px solid #1e2d4a' }}>
-          <div style={{ fontSize: 34, marginBottom: 8 }}>The first autonomous smart contract guardian on Somnia Agentic L1.</div>
+          <div style={{ fontSize: 28, marginBottom: 8, color: '#e0e8ff' }}>The first autonomous smart contract guardian on Somnia Agentic L1.</div>
           <p style={{ color: '#7a9cc0', maxWidth: 600, margin: '0 auto 24px', fontSize: 15 }}>
-            Watch. Reason. Act. No humans required. Powered by a 2-agent pipeline — JSON API + LLM Inference — with validator consensus and immutable on-chain receipts.
+            Watch. Reason. Act. No humans required. Powered by a 3-agent pipeline —
+            JSON API + LLM Inference + LLM Parse Website — with validator consensus and immutable on-chain receipts.
           </p>
           <button onClick={connectWallet} style={{ background: '#22ff88', color: '#000', border: 'none', padding: '14px 36px', borderRadius: 8, cursor: 'pointer', fontWeight: 'bold', fontSize: 16 }}>Connect Wallet to Start</button>
         </div>
@@ -276,32 +274,18 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'alerts' && <AlertLog />}
-
-        {activeTab === 'intel' && (
+        {activeTab === 'alerts'       && <AlertLog />}
+        {activeTab === 'intel'        && (
           <div>
             <h3 style={{ color: '#e0e8ff', marginBottom: 4 }}>Contract Threat Intelligence</h3>
             <p style={{ color: '#7a9cc0', fontSize: 13, marginBottom: 24 }}>Auto-fetched on-chain analysis. Heuristic flags feed into agent risk classification.</p>
             {contracts.map(addr => <ThreatIntelCard key={addr} address={addr} explorerBase={EXPLORER_BASE} />)}
           </div>
         )}
-
-        {activeTab === 'webhooks' && (
-          <div>
-            <h3 style={{ color: '#e0e8ff', marginBottom: 4 }}>Webhook Marketplace</h3>
-            <p style={{ color: '#7a9cc0', fontSize: 13, marginBottom: 16 }}>Register alert endpoints per contract. SomniaWatch keeper fires alerts autonomously on CRITICAL detections.</p>
-            <div style={{ background: '#0d1a2a', border: '1px solid #22ff8833', borderRadius: 8, padding: '14px 18px', marginBottom: 20, fontSize: 13, color: '#7a9cc0' }}>
-              💡 <strong style={{ color: '#22ff88' }}>Alerts are sent by the keeper (Node.js backend)</strong> — never from the browser.
-              Discord + Telegram credentials live in <code>.env</code> only. The keeper fires autonomously every 5 minutes.
-            </div>
-            <WebhookMarketplace contracts={contracts} />
-          </div>
-        )}
-
-        {activeTab === 'certificates' && (
-          <CertificateGallery contracts={contracts} watch={watch} cert={cert} explorerBase={EXPLORER_BASE} />
-        )}
-        {activeTab === 'leaderboard' && <Leaderboard watch={watch} explorerBase={EXPLORER_BASE} />}
+        {activeTab === 'agents'       && <AgentExplorer explorerBase={EXPLORER_BASE} />}
+        {activeTab === 'webhooks'     && <WebhookMarketplace contracts={contracts} />}
+        {activeTab === 'certificates' && <CertificateGallery contracts={contracts} watch={watch} cert={cert} explorerBase={EXPLORER_BASE} />}
+        {activeTab === 'leaderboard'  && <Leaderboard watch={watch} explorerBase={EXPLORER_BASE} />}
         {activeTab === 'how-it-works' && <AgentFlowDiagram />}
       </div>
 
