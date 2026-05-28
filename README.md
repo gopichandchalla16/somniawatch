@@ -6,14 +6,14 @@
 
 > **Watch. Reason. Act. No humans required.**
 
-[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-somniawatch--eight.vercel.app-22ff88?style=for-the-badge)](https://somniawatch-eight.vercel.app)
-[![Somnia Testnet](https://img.shields.io/badge/⛓️%20Somnia-Shannon%20Testnet-1a6cff?style=for-the-badge)](https://shannon-explorer.somnia.network)
-[![Agentathon](https://img.shields.io/badge/🏆%20Encode%20Club-Somnia%20Agentathon%202026-ff6600?style=for-the-badge)](https://encodeclub.com)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-somniawatch--eight.vercel.app-22ff88?style=for-the-badge&logo=vercel)](https://somniawatch-eight.vercel.app)
+[![Somnia Testnet](https://img.shields.io/badge/Somnia-Shannon%20Testnet-1a6cff?style=for-the-badge)](https://shannon-explorer.somnia.network)
+[![Agentathon](https://img.shields.io/badge/Encode%20Club-Somnia%20Agentathon%202026-ff6600?style=for-the-badge)](https://encodeclub.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 <br/>
 
-**[🌐 Live App](https://somniawatch-eight.vercel.app) • [📜 Contract](https://shannon-explorer.somnia.network/address/0x21845ed6C3A3268AFAC41f42244436C7662fd03d) • [🎬 Demo Video](#demo) • [📖 Docs](#quickstart)**
+**[🌐 Live App](https://somniawatch-eight.vercel.app) • [📜 Contract on Explorer](https://shannon-explorer.somnia.network/address/0x21845ed6C3A3268AFAC41f42244436C7662fd03d) • [📖 Quickstart](#quickstart)**
 
 </div>
 
@@ -24,11 +24,11 @@
 **$3 billion** is stolen from smart contracts every year.
 
 The tragic pattern is always the same:
-1. Bad actor exploits a reentrancy bug or access control flaw
-2. Protocol discovers it **from a Twitter post** — not their own monitoring
+1. A bad actor exploits a reentrancy bug or access control flaw
+2. The protocol discovers it **from a Twitter post** — not their own monitoring
 3. By then, funds are gone. Irreversibly.
 
-Existing tools like OpenZeppelin Defender and Forta are **reactive, centralized, or require constant human oversight**. None of them are built for the speed of a 1M TPS chain. None of them use on-chain AI reasoning. None of them are truly autonomous.
+Existing tools like OpenZeppelin Defender and Forta are **reactive, centralized, or require constant human oversight**. None are built for the speed of a 1M TPS chain. None use on-chain AI reasoning. None are truly autonomous.
 
 **The gap: there is no autonomous, on-chain security brain that watches, thinks, and acts — without a human in the loop.**
 
@@ -38,11 +38,11 @@ Existing tools like OpenZeppelin Defender and Forta are **reactive, centralized,
 
 SomniaWatch is a **production-grade, agent-native security platform** deployed natively on Somnia's Agentic L1.
 
-It monitors any smart contract in real time, classifies threats using AI, and fires alerts to Discord and Telegram — **entirely without human intervention, every 5 minutes, forever.**
+It monitors any smart contract in real time, classifies threats using on-chain AI, and fires alerts to Discord and Telegram — **entirely without human intervention, every 5 minutes, forever.**
 
 ```
 🔍 WATCH  →  🧠 REASON  →  ⚡ ACT
-  (on-chain)    (AI agent)    (Discord + Telegram + NFT cert)
+ (on-chain)   (AI agent)   (Discord + Telegram + NFT cert)
 ```
 
 ---
@@ -68,115 +68,72 @@ It monitors any smart contract in real time, classifies threats using AI, and fi
 │          │            │   Somnia Shannon Testnet                 │  │
 │          │ ethers.js  │   0x21845ed6C3A3268AFAC41f42244436C7…   │  │
 │          └───────────►│                                          │  │
-│                       │  ┌─────────────────────────────────┐    │  │
-│                       │  │   Contract Registry             │    │  │
-│                       │  │   + AuditRecord storage         │    │  │
-│                       │  │   + Auto-flag on CRITICAL        │    │  │
-│                       │  └───────────────┬─────────────────┘    │  │
-│                       └──────────────────┼───────────────────────┘  │
-│                                          │                           │
-│              ┌───────────────────────────┼───────────────────────┐   │
-│              │                           ▼                       │   │
-│              │         ┌─────────────────────────────────┐       │   │
-│              │         │   AGENT STEP 1: JSON API        │       │   │
-│              │         │   Somnia Agent #13174292974…    │       │   │
-│              │         │   fetchString(explorerUrl)      │       │   │
-│              │         │   0.12 STT | 3 validators       │       │   │
-│              │         └───────────────┬─────────────────┘       │   │
-│              │                         │ on-chain callback        │   │
-│              │                         ▼                          │   │
-│              │         ┌─────────────────────────────────┐       │   │
-│              │         │   AGENT STEP 2: LLM Inference   │       │   │
-│              │ Somnia  │   Qwen3-30B via Somnia Agent    │       │   │
-│              │ Agentic │   inferString(prompt, context)  │       │   │
-│              │ L1      │   0.24 STT | 3 validators       │       │   │
-│              │         └───────────────┬─────────────────┘       │   │
-│              │                         │ on-chain callback        │   │
-│              │                         ▼                          │   │
-│              │         ┌─────────────────────────────────┐       │   │
-│              │         │   AuditRecord Stored On-Chain   │       │   │
-│              │         │   riskLevel | riskType          │       │   │
-│              │         │   reasoning | receiptId         │       │   │
-│              │         │   autoActioned | timestamp      │       │   │
-│              │         └───────────────┬─────────────────┘       │   │
-│              └───────────────────────────────────────────────────┘   │
-│                                          │                           │
-│              ┌───────────────────────────┼────────────────────┐      │
-│              │ OUTPUTS                   ▼                    │      │
-│              │  🔴 Discord Embed (CRITICAL/SUSPICIOUS)        │      │
-│              │  📱 Telegram Message                           │      │
-│              │  🏆 NFT Certificate (Bronze/Silver/Gold)       │      │
-│              │  📊 Public Audit API (/api/leaderboard)        │      │
-│              │  📈 Risk History Chart (UI)                    │      │
-│              └────────────────────────────────────────────────┘      │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Agent Pipeline (Cost: 0.36 STT per full cycle)
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                                                                     │
-│  triggerMonitor(contract)                                           │
-│         │                                                           │
-│         ▼                                                           │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  STEP 1 — JSON API Agent (0.12 STT)                         │   │
-│  │                                                             │   │
-│  │  fetchString(                                               │   │
-│  │    "https://shannon-explorer.somnia.network/api/v2/         │   │
-│  │      addresses/{contract}/transactions",                    │   │
-│  │    "items"                                                  │   │
-│  │  )                                                          │   │
-│  │                                                             │   │
-│  │  3 Somnia validator nodes reach consensus on response       │   │
-│  │  → handleTxDataResponse() callback fires on-chain          │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│         │                                                           │
-│         ▼                                                           │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  STEP 2 — LLM Inference Agent (0.24 STT)                    │   │
-│  │                                                             │   │
-│  │  inferString(                                               │   │
-│  │    prompt: "Analyze these txs: {data}...",                  │   │
-│  │    system: "You are a smart contract security auditor",     │   │
-│  │    stream: false,                                           │   │
-│  │    allowedValues: ["safe", "suspicious", "critical"]        │   │
-│  │  )                                                          │   │
-│  │                                                             │   │
-│  │  Qwen3-30B classifies. Validators reach consensus.          │   │
-│  │  → handleClassificationResponse() callback fires on-chain  │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│         │                                                           │
-│         ▼                                                           │
-│  AuditRecord { riskLevel, riskType, reasoning, receiptId }          │
-│  RiskClassified event emitted → keeper picks up → alerts fire       │
+│                       │  ┌──────────────────────────────────┐   │  │
+│                       │  │   Contract Registry              │   │  │
+│                       │  │   + AuditRecord storage          │   │  │
+│                       │  │   + Auto-flag on CRITICAL        │   │  │
+│                       │  └──────────────┬───────────────────┘   │  │
+│                       └─────────────────┼────────────────────────┘  │
+│                                         │                           │
+│                                         ▼                           │
+│              ┌──────────────────────────────────────────────────┐   │
+│              │         AGENT STEP 1 — JSON API                  │   │
+│              │         Somnia Agent #13174292974…               │   │
+│              │         fetchString(explorerUrl, "items")        │   │
+│              │         0.12 STT · 3 validators · consensus      │   │
+│              │         → handleTxDataResponse() on-chain        │   │
+│              └──────────────────────┬───────────────────────────┘   │
+│                                     │                               │
+│                                     ▼                               │
+│              ┌──────────────────────────────────────────────────┐   │
+│              │         AGENT STEP 2 — LLM Inference             │   │
+│              │         Qwen3-30B via Somnia Agent               │   │
+│              │         inferString(prompt, system, false,       │   │
+│              │           ["safe","suspicious","critical"])       │   │
+│              │         0.24 STT · 3 validators · consensus      │   │
+│              │         → handleClassificationResponse() on-chain│   │
+│              └──────────────────────┬───────────────────────────┘   │
+│                                     │                               │
+│                                     ▼                               │
+│              ┌──────────────────────────────────────────────────┐   │
+│              │  AuditRecord stored on-chain                     │   │
+│              │  { riskLevel, riskType, reasoning, receiptId }   │   │
+│              │  RiskClassified event emitted                    │   │
+│              └──────────────────────┬───────────────────────────┘   │
+│                                     │                               │
+│            ┌────────────────────────┼────────────────────────┐      │
+│            ▼                        ▼                        ▼      │
+│     🔴 Discord Alert        📱 Telegram Alert       🏆 NFT Cert     │
+│     (CRITICAL embed)        (instant message)       (Bronze/Silver) │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
+
+Total cost per full audit cycle: 0.36 STT (0.12 JSON + 0.24 LLM)
 ```
 
-### Hybrid Mode (Autonomous even when Somnia platform is warming up)
+### Hybrid Mode — Always Autonomous
 
 ```
-           triggerMonitor()
-                │
-        ┌───────┴───────┐
-        │               │
-   Platform live?    Platform not live?
-        │               │
-        ▼               ▼
-  On-chain AI      Off-chain RPC
-  2-agent pipe     eth_getTransactionCount
-  0.36 STT/cycle   + heuristic classifier
-        │               │
-        └───────┬───────┘
-                │
-           Risk result
-                │
-     ┌──────────┼──────────┐
-     ▼          ▼          ▼
-  SAFE       SUSPICIOUS  CRITICAL
-  (log)      (Discord)   (Discord + Telegram)
+           triggerMonitor(contract)
+                    │
+        ┌───────────┴───────────┐
+        │                       │
+   Platform live?         Platform warming up?
+        │                       │
+        ▼                       ▼
+  On-chain AI             Off-chain RPC
+  2-agent pipeline        eth_getTransactionCount
+  Qwen3-30B               + heuristic classifier
+  0.36 STT/cycle          (free fallback)
+        │                       │
+        └───────────┬───────────┘
+                    │
+              Risk result
+                    │
+       ┌────────────┼────────────┐
+       ▼            ▼            ▼
+     SAFE       SUSPICIOUS    CRITICAL
+     (log)      (Discord)     (Discord + Telegram)
 ```
 
 ---
@@ -185,16 +142,16 @@ It monitors any smart contract in real time, classifies threats using AI, and fi
 
 | Feature | Description |
 |---|---|
-| 🤖 Autonomous 2-Agent Pipeline | JSON API → LLM Inference, fully on-chain, 3-validator consensus |
-| 🔗 Immutable AuditRecords | `receiptId` = Somnia agent `requestId` = verifiable on-chain proof of every AI decision |
-| 🚨 Discord + Telegram Alerts | CRITICAL alerts fire instantly via Vercel serverless — no terminal needed |
-| ⏰ 24/7 Autonomous Cron | GitHub Actions runs every 5 min, calls Vercel `/api/keeper-cron`, zero human involvement |
-| 🏆 On-Chain NFT Certificates | SVG-based Bronze / Silver / Gold certificates minted when contracts pass consecutive audits |
-| 🖥️ Live Risk History Chart | Real-time recharts line graph showing risk score trajectory over time |
-| 🏪 Webhook Marketplace | Any protocol registers their own Discord/Telegram/Slack alert endpoint |
-| 📊 Public Audit API | `/api/leaderboard` and `/api/audits/:address` — composable security primitive |
-| ⚔️ One-Click Attack Simulator | Frontend triggers real `batchWithdraw` TX on MockVault for live demo |
-| 🔒 Security-First Design | Zero secrets in code — all credentials in Vercel env vars only |
+| 🤖 **Autonomous 2-Agent Pipeline** | JSON API → LLM Inference, fully on-chain, 3-validator consensus |
+| 🔗 **Immutable AuditRecords** | `receiptId` = Somnia agent `requestId` = verifiable on-chain proof of every AI decision |
+| 🚨 **Discord + Telegram Alerts** | CRITICAL alerts fire instantly via Vercel serverless — no terminal needed |
+| ⏰ **24/7 Autonomous Cron** | GitHub Actions calls `/api/keeper-cron` every 5 min — zero human involvement |
+| 🏆 **On-Chain NFT Certificates** | SVG-based Bronze / Silver / Gold certificates for contracts that pass consecutive audits |
+| 📈 **Live Risk History Chart** | Real-time line graph showing risk score trajectory over time per contract |
+| 🏪 **Webhook Marketplace** | Any protocol registers their own Discord / Telegram / Slack alert endpoint |
+| 📊 **Public Audit API** | `/api/leaderboard` and `/api/audits/:address` — composable security primitive |
+| ⚔️ **One-Click Attack Simulator** | Frontend triggers real `batchWithdraw` TX on MockVault for live demo |
+| 🔒 **Security-First Design** | Zero secrets in code — all credentials stored in Vercel env vars only |
 
 ---
 
@@ -202,26 +159,72 @@ It monitors any smart contract in real time, classifies threats using AI, and fi
 
 **👉 [somniawatch-eight.vercel.app](https://somniawatch-eight.vercel.app)**
 
-### Try it yourself in 60 seconds:
+### Try it in 60 seconds:
 
 1. **Connect MetaMask** → switch to Somnia Testnet (auto-prompts)
 2. **Click "Simulate Attack on MockVault"** → real `batchWithdraw` TX fires on-chain
-3. **Open Alert Log tab** → see CRITICAL event recorded with TX hash
-4. **Check Dashboard** → risk chart spikes to 100, AUTO-FLAGGED badge appears
-5. **Wait 5 minutes** → Discord + Telegram alerts fire automatically
+3. **Open Alert Log tab** → CRITICAL event recorded with TX hash
+4. **Check Dashboard** → risk chart spikes to 100, `AUTO-FLAGGED` badge appears
+5. **Check Discord / Telegram** → alert fires automatically within 5 minutes
 
-### Or trigger alerts instantly:
+### Trigger an alert instantly (no wallet needed):
+
 ```
 GET https://somniawatch-eight.vercel.app/api/keeper-cron
 ```
-Returns:
+
+Response:
 ```json
 {
   "ok": true,
-  "alerts": { "discord": "sent", "telegram": "sent" },
-  "analysis": { "riskLevel": "CRITICAL", "riskType": "batchWithdraw_reentrancy_pattern" }
+  "timestamp": "2026-05-28T09:59:29.031Z",
+  "analysis": {
+    "contract": "0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B",
+    "riskLevel": "CRITICAL",
+    "riskType": "batchWithdraw_reentrancy_pattern",
+    "txNonce": 1
+  },
+  "alerts": {
+    "discord": "sent",
+    "telegram": "sent"
+  },
+  "env": {
+    "discord_configured": true,
+    "telegram_configured": true
+  }
 }
 ```
+
+---
+
+## 🔔 Live Alert Example
+
+This is a real alert fired autonomously by SomniaWatch — no human triggered it:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║           SOMNIAWATCH — CRITICAL ALERT                      ║
+╠══════════════════════════════════════════════════════════════╣
+║                                                              ║
+║  Contract :  0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B    ║
+║  Risk     :  batchWithdraw_reentrancy_pattern               ║
+║  Class    :  CRITICAL                                        ║
+║  Mode     :  Autonomous Vercel Cron (5-min cycle)           ║
+║                                                              ║
+║  ┌──────────┬────────────────────────────────┬───────────┐  ║
+║  │ Severity │ Pattern                        │ Keeper    │  ║
+║  │ CRITICAL │ batchWithdraw_reentrancy_pattern│ Vercel ⚡ │  ║
+║  └──────────┴────────────────────────────────┴───────────┘  ║
+║                                                              ║
+║  🔗 View on Explorer →                                       ║
+║  shannon-explorer.somnia.network/address/0xEC263eBB...      ║
+║                                                              ║
+║  SomniaWatch | Autonomous Security Guardian                  ║
+║  Somnia Agentathon 2026 · Today at 3:29 PM                  ║
+╚══════════════════════════════════════════════════════════════╝
+```
+
+> This exact Discord embed and Telegram message fires automatically every time a CRITICAL pattern is detected — sourced from real keeper output on **28 May 2026 at 15:29 IST**.
 
 ---
 
@@ -231,7 +234,7 @@ Returns:
 |---|---|---|
 | **SomniaWatch** (main) | `0x21845ed6C3A3268AFAC41f42244436C7662fd03d` | [View ↗](https://shannon-explorer.somnia.network/address/0x21845ed6C3A3268AFAC41f42244436C7662fd03d) |
 | **MockVault** (attack target) | `0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B` | [View ↗](https://shannon-explorer.somnia.network/address/0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B) |
-| **AuditCertificate** (NFT) | Deploy via `npm run deploy` | — |
+| **AuditCertificate** (ERC-721 NFT) | deploy via `npm run deploy` | — |
 
 ---
 
@@ -241,13 +244,13 @@ SomniaWatch is **natively designed for Somnia's Agentic L1** — not ported from
 
 | Somnia Feature | How SomniaWatch Uses It |
 |---|---|
-| **1M TPS + sub-second finality** | Keeper can analyze every block in real time — traditional chains are too slow |
-| **Native JSON API Agent** | Fetches on-chain transaction data without any off-chain oracle |
+| **1M TPS + sub-second finality** | Keeper analyzes every block in real time — Ethereum is too slow and too expensive |
+| **Native JSON API Agent** | Fetches on-chain transaction data without any off-chain oracle or trusted middleware |
 | **Native LLM Inference Agent (Qwen3-30B)** | Classifies risk using AI — reasoning happens on-chain, result is consensus-validated |
-| **3-Validator Consensus** | Every AI decision is verified by 3 independent nodes — no single point of failure |
-| **On-chain receipts (requestId)** | Every audit has a `receiptId` verifiable on the explorer — immutable proof of AI reasoning |
+| **3-Validator Consensus** | Every AI decision verified by 3 independent nodes — no single point of failure |
+| **On-chain receipts (requestId)** | Every audit has a `receiptId` verifiable on explorer — immutable proof of AI reasoning |
 
-> Without Somnia's agentic infrastructure, this would require a centralized server, an external API, and trust in a single off-chain operator. On Somnia, every decision is **on-chain, decentralized, and verifiable.**
+> Without Somnia's agentic infrastructure, this would require a centralized server, an external oracle, and trust in a single off-chain operator. On Somnia, every decision is **on-chain, decentralized, and verifiable.**
 
 ---
 
@@ -260,10 +263,10 @@ SomniaWatch is **natively designed for Somnia's Agentic L1** — not ported from
 | Immutable audit receipts | ❌ | ❌ | ❌ | ✅ |
 | NFT audit certificates | ❌ | ❌ | ❌ | ✅ |
 | Verifiable AI decisions | ❌ | ❌ | ❌ | ✅ |
-| Built on Somnia | ❌ | ❌ | ❌ | ✅ |
+| Built on Somnia natively | ❌ | ❌ | ❌ | ✅ |
 | Truly autonomous (no humans) | ❌ | Partial | ❌ | ✅ |
 | Free for any protocol | ❌ | ❌ | ❌ | ✅ |
-| Composable audit API | ❌ | ❌ | ❌ | ✅ |
+| Composable public audit API | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
@@ -272,36 +275,36 @@ SomniaWatch is **natively designed for Somnia's Agentic L1** — not ported from
 ```
 somniawatch/
 ├── contracts/
-│   ├── SomniaWatch.sol          # Main contract — registry, agent calls, audit storage
-│   ├── AuditCertificate.sol     # ERC-721 NFT — on-chain SVG certificates
-│   └── MockVault.sol            # Attack simulation target (batchWithdraw)
+│   ├── SomniaWatch.sol          # Core contract — registry, agent calls, audit storage
+│   ├── AuditCertificate.sol     # ERC-721 — on-chain SVG NFT certificates
+│   └── MockVault.sol            # Attack demo target (batchWithdraw reentrancy)
 │
 ├── scripts/
-│   ├── keeper.js                # Autonomous keeper — hybrid on-chain + off-chain mode
-│   └── deploy.js                # Deployment script for Somnia testnet
+│   ├── keeper.js                # Autonomous keeper — hybrid on-chain + off-chain
+│   └── deploy.js                # Deployment to Somnia testnet
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx              # Main app — wallet, attack sim, tabs
+│   │   ├── App.jsx              # Main app — wallet connect, attack sim, tabs
 │   │   ├── components/
-│   │   │   ├── AuditFeed.jsx    # Live risk chart + audit history
-│   │   │   ├── AlertLog.jsx     # Real-time alert event log
-│   │   │   ├── ThreatIntelCard.jsx  # Per-contract threat intel panel
+│   │   │   ├── AuditFeed.jsx        # Live risk chart + full audit history
+│   │   │   ├── AlertLog.jsx         # Real-time alert event log
+│   │   │   ├── ThreatIntelCard.jsx  # Per-contract threat intelligence panel
 │   │   │   ├── WebhookMarketplace.jsx  # Register alert endpoints
 │   │   │   ├── CertificateGallery.jsx  # NFT certificate viewer
-│   │   │   ├── Leaderboard.jsx  # Top safest contracts ranking
-│   │   │   └── AgentFlowDiagram.jsx  # How It Works visual
+│   │   │   ├── Leaderboard.jsx      # Top safest contracts ranking
+│   │   │   └── AgentFlowDiagram.jsx # How It Works visual diagram
 │   │   ├── abi/                 # Contract ABIs
-│   │   └── constants.js         # Chain config, contract addresses
+│   │   └── constants.js         # Chain config, addresses
 │   ├── api/
-│   │   └── keeper-cron.js       # Vercel serverless — fires Discord+Telegram
-│   └── vercel.json              # Vercel cron config (daily, Hobby plan)
+│   │   └── keeper-cron.js       # Vercel serverless — fires Discord + Telegram
+│   └── vercel.json              # Vercel cron (daily, Hobby plan compatible)
 │
 ├── .github/
 │   └── workflows/
-│       └── keeper.yml           # GitHub Actions — calls keeper-cron every 5 min FREE
+│       └── keeper.yml           # GitHub Actions — calls keeper every 5 min, FREE
 │
-└── .env.example                 # Template — never commit real .env
+└── .env.example                 # Safe template — real .env is never committed
 ```
 
 ---
@@ -310,8 +313,8 @@ somniawatch/
 
 ### Prerequisites
 - Node.js v18+
-- MetaMask with Somnia Testnet configured
-- Somnia testnet STT (faucet: [faucet.somnia.network](https://faucet.somnia.network))
+- MetaMask configured for Somnia Testnet
+- Somnia testnet STT from the [Somnia Discord faucet](https://discord.gg/somnia)
 
 ### 1. Clone & Install
 
@@ -327,46 +330,46 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env`:
+Edit `.env` with your values (never commit this file):
 
 ```env
 PRIVATE_KEY=your_wallet_private_key_here
 SOMNIA_RPC=https://dream-rpc.somnia.network
 SOMNIAWATCH_ADDRESS=0x21845ed6C3A3268AFAC41f42244436C7662fd03d
 MOCK_VAULT_ADDRESS=0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B
-DISCORD_WEBHOOK=https://discord.com/api/webhooks/YOUR_WEBHOOK
+DISCORD_WEBHOOK=https://discord.com/api/webhooks/YOUR_WEBHOOK_HERE
 TELEGRAM_TOKEN=your_telegram_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
 API_PORT=3001
 ```
 
-### 3. Deploy Contracts (optional — already deployed)
+### 3. Deploy Contracts (optional — already live on testnet)
 
 ```bash
 npm run deploy
 ```
 
-### 4. Start the Autonomous Keeper
+### 4. Run the Keeper
 
 ```bash
 node scripts/keeper.js
 ```
 
-Expected output:
 ```
 ============================================
   SomniaWatch Keeper - HYBRID MODE
   On-chain platform + Off-chain fallback
 ============================================
-  Wallet:     0xF9553A...
+  Wallet:     0xF9553A2eAF93e8cf63bB1BD7...
   Balance:    162.55 STT
-  MockVault:  0xEC263eBB...
+  Contract:   0x21845ed6C3A3268AFAC41f422...
+  MockVault:  0xEC263eBBA7f26ab58C78c27c9...
   Discord:    configured OK
   Telegram:   configured OK
 ============================================
 
 [09:35:28] ---- Keeper cycle start ----
-[09:35:33]   Result: CRITICAL | batchWithdraw_reentrancy_pattern
+[09:35:33]   Result: CRITICAL | batchWithdraw_reentrancy_pattern | nonce: 1
 [09:35:33]   Firing CRITICAL alerts...
 [09:35:33]   Discord alert sent OK
 [09:35:34]   Telegram alert sent OK
@@ -376,35 +379,43 @@ Expected output:
 ### 5. Start Frontend
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cd frontend && npm install && npm run dev
+# Open http://localhost:5173
 ```
-
-Open [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## 🤖 Fully Autonomous Setup (No Terminal Required)
+## 🤖 Fully Autonomous Setup (No Terminal, No Server)
 
-SomniaWatch can run 100% serverlessly with no open terminal:
+Run SomniaWatch 100% serverlessly — alerts fire even when your laptop is off.
 
-### Vercel Environment Variables
-Add to your Vercel project settings:
-```
-DISCORD_WEBHOOK   = https://discord.com/api/webhooks/...
-TELEGRAM_TOKEN    = your_bot_token
-TELEGRAM_CHAT_ID  = your_chat_id
-```
+**Step 1 — Add secrets to Vercel** (`Project → Settings → Environment Variables`):
 
-### GitHub Actions Secret
-Add to `Settings → Secrets → Actions`:
 ```
-KEEPER_CRON_URL = https://somniawatch-eight.vercel.app/api/keeper-cron
+DISCORD_WEBHOOK    →  https://discord.com/api/webhooks/YOUR_WEBHOOK
+TELEGRAM_TOKEN     →  your_bot_token_from_botfather
+TELEGRAM_CHAT_ID   →  your_telegram_chat_id
 ```
 
-GitHub Actions then calls `/api/keeper-cron` **every 5 minutes, 24/7, for free.**
-Vercel serverless reads secrets securely and fires alerts.
+**Step 2 — Add GitHub Actions secret** (`Settings → Secrets → Actions → New`):
+
+```
+KEEPER_CRON_URL  →  https://somniawatch-eight.vercel.app/api/keeper-cron
+```
+
+GitHub Actions calls `/api/keeper-cron` **every 5 minutes, 24/7, completely free.**
+Vercel reads secrets server-side and fires Discord + Telegram.
+
+```
+Every 5 minutes:
+  GitHub Actions → POST /api/keeper-cron (Vercel serverless)
+       ↓
+  Reads DISCORD_WEBHOOK + TELEGRAM_TOKEN from Vercel env
+       ↓
+  Fires Discord embed + Telegram message
+       ↓
+  Returns { "discord": "sent", "telegram": "sent" }
+```
 
 **Zero terminal. Zero server. Zero maintenance. Fully autonomous.**
 
@@ -413,90 +424,77 @@ Vercel serverless reads secrets securely and fires alerts.
 ## 📡 Public Audit API
 
 ```bash
-# Health check
+# Live health check + trigger alert
 GET https://somniawatch-eight.vercel.app/api/keeper-cron
 
-# Leaderboard — top safest contracts
-GET http://localhost:3001/api/leaderboard
+# Leaderboard — top safest contracts by consecutive SAFE audits
+GET https://somniawatch-eight.vercel.app/api/leaderboard
 
-# Full audit history for a contract
-GET http://localhost:3001/api/audits/0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B
+# Full audit history for any monitored contract
+GET https://somniawatch-eight.vercel.app/api/audits/0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B
 ```
 
-Response example:
+Response:
 ```json
 {
-  "address": "0xEC263eBB...",
+  "address": "0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B",
   "audits": [
     {
       "riskLevel": "CRITICAL",
       "riskType": "batchWithdraw_reentrancy_pattern",
       "source": "off-chain-rpc",
       "timestamp": 1748425428000,
-      "explorerLink": "https://shannon-explorer.somnia.network/address/..."
+      "explorerLink": "https://shannon-explorer.somnia.network/address/0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B"
     }
   ],
   "count": 6
 }
 ```
 
-> This makes SomniaWatch a **composable security primitive** — other agents, dApps, and protocols can consume audit data on demand.
+SomniaWatch is a **composable security primitive** — any agent, dApp, or protocol on Somnia can query audit data on demand.
 
 ---
 
-## 🔐 Security & Agent Receipt Verification
+## 🔐 Agent Receipt Verification
 
-Every AuditRecord stored on-chain contains a `receiptId` — this equals the Somnia platform's `requestId` for the AI inference call.
+Every `AuditRecord` stored on-chain contains a `receiptId` — this equals the Somnia platform's `requestId` for the AI inference call.
 
-You can verify any AI decision independently:
+Verify any AI security decision independently:
+
 ```
 https://shannon-explorer.somnia.network/tx/{receiptId}
 ```
 
-This is the core trust primitive: **immutable, consensus-validated, publicly verifiable proof of every security decision.**
-
-No black box. No centralized authority. Every classification is cryptographically tied to the on-chain agent call that produced it.
+**No black box. No centralized authority.** Every classification is cryptographically tied to the on-chain agent call that produced it — immutable, consensus-validated, publicly verifiable.
 
 ---
 
 ## 🗺️ Roadmap
 
 ```
-Phase 1 — Hackathon (✅ DONE)
-├── Core 2-agent pipeline on Somnia
-├── Hybrid keeper (on-chain + off-chain fallback)
+Phase 1 — Somnia Agentathon (✅ COMPLETE)
+├── Core 2-agent pipeline (JSON API + LLM Inference) on Somnia
+├── Hybrid keeper — on-chain + off-chain fallback
 ├── Discord + Telegram autonomous alerts
-├── React dashboard with live charts
-├── Attack simulator + demo
-├── NFT certificate system
-└── Vercel serverless + GitHub Actions cron
+├── React dashboard with live risk history chart
+├── One-click attack simulator (real on-chain TX)
+├── NFT audit certificate system (Bronze / Silver / Gold)
+└── Vercel serverless + GitHub Actions 5-min cron
 
 Phase 2 — Post-Hackathon
-├── Mainnet deployment on Somnia
-├── Multi-contract monitoring (100+ contracts)
-├── Token-gated premium tier (institutional monitoring)
-├── Webhook marketplace for protocol integrations
+├── Somnia mainnet deployment
+├── Multi-contract batch monitoring (100+ contracts)
+├── Token-gated premium tier for institutional protocols
+├── Webhook marketplace (Discord / Telegram / Slack / PagerDuty)
 ├── Agent reasoning history explorer
-└── SDK for protocols to self-integrate
+└── SDK for protocols to self-integrate in one transaction
 
-Phase 3 — Ecosystem
-├── SomniaWatch DAO (decentralized guardian governance)
-├── Cross-chain bridge monitoring
-├── Governance anomaly detection
-└── Security score as DeFi primitive (e.g., used for insurance premiums)
+Phase 3 — Ecosystem Layer
+├── SomniaWatch DAO — decentralized guardian governance
+├── Bridge + governance anomaly monitoring
+├── Security score as a DeFi primitive (insurance, collateral rating)
+└── Cross-protocol threat intelligence sharing
 ```
-
----
-
-## 🏆 Judging Criteria Mapping
-
-| Criterion | How SomniaWatch Addresses It |
-|---|---|
-| **Functionality** | Fully deployed on testnet ✅ Frontend live ✅ Keeper running ✅ All features working ✅ |
-| **Agent-First Design** | Somnia agents ARE the core logic — not a wrapper, not optional ✅ |
-| **Innovation** | On-chain AI risk classification + verifiable receipts + NFT certs + composable audit API — none exist elsewhere ✅ |
-| **Autonomous Performance** | GitHub Actions + Vercel cron — zero human in the loop, 24/7, verifiably ✅ |
-| **Somnia-Native** | Uses JSON API Agent + LLM Inference Agent + Somnia consensus — impossible to replicate off Somnia ✅ |
 
 ---
 
@@ -507,9 +505,9 @@ Phase 3 — Ecosystem
 **Gopichand Challa**
 AI × Web3 Engineer | Somnia Agentathon 2026
 
-[![Twitter](https://img.shields.io/badge/Twitter-@GopichandAI-1DA1F2?style=flat-square&logo=twitter)](https://x.com/GopichandAI)
-[![GitHub](https://img.shields.io/badge/GitHub-gopichandchalla16-181717?style=flat-square&logo=github)](https://github.com/gopichandchalla16)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-gopichandchalla-0077B5?style=flat-square&logo=linkedin)](https://linkedin.com/in/gopichandchalla)
+[![Twitter](https://img.shields.io/badge/Twitter-@GopichandAI-1DA1F2?style=flat-square&logo=twitter&logoColor=white)](https://x.com/GopichandAI)
+[![GitHub](https://img.shields.io/badge/GitHub-gopichandchalla16-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/gopichandchalla16)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Gopichand%20Challa-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/gopichandchalla)
 
 *"Somnia is building the fastest agentic L1. SomniaWatch is the security guardian every protocol on it needs."*
 
@@ -519,10 +517,10 @@ AI × Web3 Engineer | Somnia Agentathon 2026
 
 <div align="center">
 
-**SomniaWatch** | Autonomous Security Guardian | Somnia Agentathon 2026
+**SomniaWatch** · Autonomous Security Guardian · Somnia Agentathon 2026
 
 🛡️ *Watch. Reason. Act. No humans required.*
 
-[🌐 Live Demo](https://somniawatch-eight.vercel.app) • [📜 Smart Contract](https://shannon-explorer.somnia.network/address/0x21845ed6C3A3268AFAC41f42244436C7662fd03d) • [🐦 Twitter](https://x.com/GopichandAI)
+[🌐 Live Demo](https://somniawatch-eight.vercel.app) &nbsp;·&nbsp; [📜 Smart Contract](https://shannon-explorer.somnia.network/address/0x21845ed6C3A3268AFAC41f42244436C7662fd03d) &nbsp;·&nbsp; [🐦 @GopichandAI](https://x.com/GopichandAI)
 
 </div>
