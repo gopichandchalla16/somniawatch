@@ -6,8 +6,8 @@ import Leaderboard from './components/Leaderboard';
 import AgentFlowDiagram from './components/AgentFlowDiagram';
 import AlertLog from './components/AlertLog';
 import ThreatIntelCard from './components/ThreatIntelCard';
-import WebhookMarketplace from './components/WebhookMarketplace';
 import AgentExplorer from './components/AgentExplorer';
+import AgentPlayground from './components/AgentPlayground';
 import SomniaWatchABI from './abi/SomniaWatch.json';
 import AuditCertABI from './abi/AuditCertificate.json';
 import {
@@ -32,16 +32,14 @@ function logAlert(entry) {
     const existing = JSON.parse(localStorage.getItem('sw_alert_log') || '[]');
     existing.push(entry);
     localStorage.setItem('sw_alert_log', JSON.stringify(existing));
-  } catch (e) { /* ignore */ }
+  } catch (e) {}
 }
 
 function getLocalAuditCount() {
   try {
     const keys = Object.keys(localStorage).filter(k => k.startsWith('sw_audits_'));
     let total = 0;
-    keys.forEach(k => {
-      try { total += JSON.parse(localStorage.getItem(k) || '[]').length; } catch { /* skip */ }
-    });
+    keys.forEach(k => { try { total += JSON.parse(localStorage.getItem(k) || '[]').length; } catch {} });
     const alerts = JSON.parse(localStorage.getItem('sw_alert_log') || '[]');
     return Math.max(total, alerts.length);
   } catch { return 0; }
@@ -63,27 +61,19 @@ export default function App() {
 
   const loadStats = useCallback(async () => {
     const localCount = getLocalAuditCount();
-    let onChainTotal = 0;
-    let onChainRegistered = 1;
+    let onChainTotal = 0, onChainRegistered = 1;
     if (watch) {
       try {
         const total      = await watch.totalAuditsCompleted();
         const registered = await watch.getRegisteredCount();
         onChainTotal      = Number(total);
         onChainRegistered = Math.max(1, Number(registered));
-      } catch { /* use local */ }
+      } catch {}
     }
-    setStats({
-      totalAudits: Math.max(localCount, onChainTotal),
-      registered:  onChainRegistered,
-    });
+    setStats({ totalAudits: Math.max(localCount, onChainTotal), registered: onChainRegistered });
   }, [watch]);
 
-  useEffect(() => {
-    loadStats();
-    const interval = setInterval(loadStats, 30000);
-    return () => clearInterval(interval);
-  }, [loadStats]);
+  useEffect(() => { loadStats(); const i = setInterval(loadStats, 30000); return () => clearInterval(i); }, [loadStats]);
 
   const connectWallet = async () => {
     if (!window.ethereum) return alert('Please install MetaMask');
@@ -93,30 +83,18 @@ export default function App() {
       const network = await p.getNetwork();
       if (network.chainId !== BigInt(SOMNIA_CHAIN_ID)) {
         try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x' + SOMNIA_CHAIN_ID.toString(16) }],
-          });
-        } catch (_switchErr) {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0x' + SOMNIA_CHAIN_ID.toString(16),
-              chainName: 'Somnia Testnet',
-              nativeCurrency: { name: 'STT', symbol: 'STT', decimals: 18 },
-              rpcUrls: [SOMNIA_RPC],
-              blockExplorerUrls: ['https://shannon-explorer.somnia.network'],
-            }],
-          });
+          await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x' + SOMNIA_CHAIN_ID.toString(16) }] });
+        } catch {
+          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x' + SOMNIA_CHAIN_ID.toString(16), chainName: 'Somnia Testnet', nativeCurrency: { name: 'STT', symbol: 'STT', decimals: 18 }, rpcUrls: [SOMNIA_RPC], blockExplorerUrls: ['https://shannon-explorer.somnia.network'] }] });
         }
       }
-      const p2   = new ethers.BrowserProvider(window.ethereum);
-      const s    = await p2.getSigner();
+      const p2 = new ethers.BrowserProvider(window.ethereum);
+      const s  = await p2.getSigner();
       const addr = await s.getAddress();
       setProvider(p2); setSigner(s); setAccount(addr);
       setWatch(new ethers.Contract(SOMNIAWATCH_ADDRESS, SomniaWatchABI, s));
       setCert(new ethers.Contract(CERTIFICATE_ADDRESS, AuditCertABI, s));
-    } catch (e) { console.error('connectWallet error:', e); }
+    } catch (e) { console.error(e); }
   };
 
   const handleRegister = async () => {
@@ -135,137 +113,178 @@ export default function App() {
 
   const simulateAttack = async () => {
     if (!signer) return alert('Connect wallet first');
-    setAttackLoading(true);
-    setAttackStatus('');
+    setAttackLoading(true); setAttackStatus('');
     const vault = new ethers.Contract(MOCK_VAULT_ADDRESS, MOCK_VAULT_ABI, signer);
     const addr  = await signer.getAddress();
-    const SHORT = MOCK_VAULT_ADDRESS.slice(0, 10) + '...' + MOCK_VAULT_ADDRESS.slice(-6);
+    const SHORT = MOCK_VAULT_ADDRESS.slice(0,10)+'...'+MOCK_VAULT_ADDRESS.slice(-6);
     try {
       let vaultBal = BigInt(0);
-      try { vaultBal = await vault.balances(addr); } catch { /* ignore */ }
-      const needed = ethers.parseEther('0.005');
-      if (vaultBal < needed) {
-        setAttackStatus('Auto-depositing 0.05 STT into MockVault (approve in MetaMask)...');
-        const depositTx = await vault.deposit({ value: ethers.parseEther('0.05') });
-        setAttackStatus('Waiting for deposit confirmation...');
-        await depositTx.wait();
-        setAttackStatus('Deposit confirmed. Executing batchWithdraw attack...');
-      } else {
-        setAttackStatus('Vault balance OK. Executing batchWithdraw attack...');
+      try { vaultBal = await vault.balances(addr); } catch {}
+      if (vaultBal < ethers.parseEther('0.005')) {
+        setAttackStatus('Auto-depositing 0.05 STT...');
+        const dep = await vault.deposit({ value: ethers.parseEther('0.05') });
+        setAttackStatus('Confirming deposit...');
+        await dep.wait();
       }
+      setAttackStatus('Executing batchWithdraw x5...');
       const tx      = await vault.batchWithdraw(ethers.parseEther('0.001'), 5);
-      setAttackStatus('Waiting for batchWithdraw confirmation...');
       const receipt = await tx.wait();
       logAlert({ ts: Date.now(), level: 2, contract: SHORT, type: 'batchWithdraw x5 - reentrancy_pattern', discord: true, telegram: true, receipt: receipt.hash });
-      setAttackStatus('CRITICAL: Attack confirmed on-chain! TX: ' + receipt.hash.slice(0, 18) + '...\nSomniaWatch agents classify CRITICAL in next 5-min cycle.\nCHECK_ALERT_LOG');
+      setAttackStatus('CONFIRMED|TX:' + receipt.hash.slice(0,18));
       setTimeout(loadStats, 1000);
     } catch (err) {
-      console.warn('batchWithdraw demo mode:', err.message);
-      logAlert({ ts: Date.now(), level: 2, contract: SHORT, type: 'batchWithdraw_pattern_detected (demo)', discord: true, telegram: true, receipt: 'demo_' + Date.now() });
-      setAttackStatus('CRITICAL: Attack pattern logged! batchWithdraw signature detected.\nClassification: CRITICAL - reentrancy risk pattern matched.\nCHECK_ALERT_LOG');
+      logAlert({ ts: Date.now(), level: 2, contract: SHORT, type: 'batchWithdraw_pattern_detected (demo)', discord: true, telegram: true, receipt: 'demo_'+Date.now() });
+      setAttackStatus('DEMO|Attack pattern logged — CRITICAL classification pending.');
       setTimeout(loadStats, 1000);
     } finally { setAttackLoading(false); }
   };
 
   const tabs = [
-    { id: 'dashboard',    label: 'Dashboard' },
-    { id: 'alerts',       label: 'Alert Log' },
-    { id: 'intel',        label: 'Threat Intel' },
-    { id: 'agents',       label: '🤖 Agent Explorer' },
-    { id: 'webhooks',     label: 'Webhooks' },
-    { id: 'certificates', label: 'NFT Certificates' },
-    { id: 'leaderboard',  label: 'Leaderboard' },
-    { id: 'how-it-works', label: 'How It Works' },
+    { id: 'dashboard',    label: '📡 Dashboard'       },
+    { id: 'alerts',       label: '🔔 Alert Log'        },
+    { id: 'intel',        label: '🔍 Threat Intel'     },
+    { id: 'agents',       label: '🤖 Agent Explorer'   },
+    { id: 'playground',   label: '🧪 Playground'       },
+    { id: 'certificates', label: '🏅 Certificates'     },
+    { id: 'leaderboard',  label: '🏆 Leaderboard'      },
+    { id: 'how-it-works', label: '⚙️ How It Works'     },
   ];
 
+  const isConfirmed = attackStatus.startsWith('CONFIRMED');
+  const isDemo      = attackStatus.startsWith('DEMO');
+  const attackMsg   = attackStatus.replace('CONFIRMED|', '').replace('DEMO|', '');
+
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0f1a', color: '#e0e8ff', fontFamily: 'monospace' }}>
-      <header style={{ borderBottom: '1px solid #1e2d4a', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26, color: '#22ff88' }}>SomniaWatch</h1>
-          <p style={{ margin: 0, fontSize: 12, color: '#7a9cc0' }}>Autonomous Agentic Security Guardian on Somnia L1</p>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
+
+      {/* Somnia-style top bar */}
+      <header style={{
+        borderBottom: '1px solid var(--border)',
+        padding: '0 28px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        height: 60,
+        background: 'linear-gradient(180deg, #0a0a12 0%, var(--bg-base) 100%)',
+        position: 'sticky', top: 0, zIndex: 100,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: 'linear-gradient(135deg, var(--purple-dim), var(--cyan))',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16,
+          }}>🛡️</div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>SomniaWatch</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Agentic Security · Somnia L1</div>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: '#7a9cc0' }}>
-            Audits: <strong style={{ color: stats.totalAudits > 0 ? '#22ff88' : '#7a9cc0' }}>{stats.totalAudits}</strong>
-            {' | Contracts: '}
-            <strong style={{ color: '#22aaff' }}>{stats.registered}</strong>
-          </span>
+
+        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+            <span style={{ color: 'var(--text-dim)' }}>Audits <strong style={{ color: 'var(--green)' }}>{stats.totalAudits}</strong></span>
+            <span style={{ color: 'var(--border)', userSelect: 'none' }}>|</span>
+            <span style={{ color: 'var(--text-dim)' }}>Contracts <strong style={{ color: 'var(--cyan)' }}>{stats.registered}</strong></span>
+          </div>
           {account
-            ? <span style={{ fontSize: 12, color: '#22ff88', background: '#0d2a1a', padding: '6px 12px', borderRadius: 6 }}>{account.slice(0,8)}...{account.slice(-4)}</span>
-            : <button onClick={connectWallet} style={{ background: '#1a6cff', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold' }}>Connect Wallet</button>
+            ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-card)', border: '1px solid var(--border-glow)', padding: '5px 12px', borderRadius: 20 }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', animation: 'blink 2s infinite' }} />
+                <span style={{ fontSize: 12, color: 'var(--purple)', fontFamily: 'var(--font-mono)' }}>{account.slice(0,6)}...{account.slice(-4)}</span>
+              </div>
+            )
+            : <button className="btn btn-purple" onClick={connectWallet}>Connect Wallet</button>
           }
         </div>
       </header>
 
+      {/* Hero — only when disconnected */}
       {!account && (
-        <div style={{ textAlign: 'center', padding: '48px 24px', borderBottom: '1px solid #1e2d4a' }}>
-          <div style={{ fontSize: 28, marginBottom: 8, color: '#e0e8ff' }}>The first autonomous smart contract guardian on Somnia Agentic L1.</div>
-          <p style={{ color: '#7a9cc0', maxWidth: 600, margin: '0 auto 24px', fontSize: 15 }}>
-            Watch. Reason. Act. No humans required. Powered by a 3-agent pipeline —
-            JSON API + LLM Inference + LLM Parse Website — with validator consensus and immutable on-chain receipts.
+        <div style={{
+          padding: '64px 28px 48px',
+          textAlign: 'center',
+          borderBottom: '1px solid var(--border)',
+          background: 'radial-gradient(ellipse 60% 40% at 50% 0%, #7c3aed18 0%, transparent 70%)',
+        }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--bg-card)', border: '1px solid var(--border-glow)', padding: '4px 14px', borderRadius: 20, fontSize: 11, color: 'var(--purple)', marginBottom: 20 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--purple)', display: 'inline-block' }} />
+            Somnia Agentathon 2026
+          </div>
+          <h1 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.04em', marginBottom: 12, lineHeight: 1.1 }}>
+            The first{' '}
+            <span style={{ background: 'linear-gradient(90deg, var(--purple), var(--cyan))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>autonomous</span>
+            {' '}smart contract guardian
+          </h1>
+          <p style={{ color: 'var(--text-sec)', maxWidth: 520, margin: '0 auto 32px', fontSize: 16, lineHeight: 1.7 }}>
+            3-agent pipeline · JSON API + LLM Inference + LLM Parse Website · validator consensus · immutable on-chain receipts
           </p>
-          <button onClick={connectWallet} style={{ background: '#22ff88', color: '#000', border: 'none', padding: '14px 36px', borderRadius: 8, cursor: 'pointer', fontWeight: 'bold', fontSize: 16 }}>Connect Wallet to Start</button>
+          <button className="btn btn-purple" style={{ padding: '12px 32px', fontSize: 15 }} onClick={connectWallet}>Connect Wallet to Start</button>
         </div>
       )}
 
-      <div style={{ display: 'flex', borderBottom: '1px solid #1e2d4a', padding: '0 24px', overflowX: 'auto' }}>
+      {/* Nav tabs */}
+      <div style={{
+        display: 'flex', borderBottom: '1px solid var(--border)',
+        padding: '0 28px', overflowX: 'auto', background: 'var(--bg-base)',
+        position: 'sticky', top: 60, zIndex: 99,
+      }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            padding: '12px 16px', background: 'none', border: 'none', whiteSpace: 'nowrap',
-            borderBottom: activeTab === t.id ? '2px solid #22ff88' : '2px solid transparent',
-            color: activeTab === t.id ? '#22ff88' : '#7a9cc0',
-            cursor: 'pointer', fontFamily: 'monospace', fontSize: 13,
+            padding: '14px 16px', background: 'none', border: 'none', whiteSpace: 'nowrap',
+            borderBottom: activeTab === t.id ? '2px solid var(--purple)' : '2px solid transparent',
+            color: activeTab === t.id ? 'var(--purple)' : 'var(--text-dim)',
+            cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 500,
+            transition: 'color 0.2s',
           }}>{t.label}</button>
         ))}
       </div>
 
-      <div style={{ padding: '24px' }}>
+      {/* Content */}
+      <div style={{ padding: '28px', maxWidth: 1100, margin: '0 auto' }}>
 
         {activeTab === 'dashboard' && (
           <div>
-            <div style={{ background: '#0d1a2a', border: '1px solid #ff4444', borderRadius: 10, padding: 20, marginBottom: 24 }}>
-              <h3 style={{ color: '#ff4444', margin: '0 0 4px' }}>One-Click Attack Simulator</h3>
-              <p style={{ color: '#7a9cc0', fontSize: 13, margin: '0 0 12px' }}>
-                Calls <code>batchWithdraw(0.001 STT x 5)</code> on MockVault. Auto-deposits if needed.
-                Agents classify CRITICAL in next 5-min keeper cycle.
-                <strong style={{ color: '#22ff88' }}> Alert Log records every event automatically.</strong>
-              </p>
-              <button onClick={simulateAttack} disabled={attackLoading} style={{
-                background: attackLoading ? '#441100' : '#cc2200', color: '#fff',
-                border: 'none', padding: '10px 28px', borderRadius: 6,
-                cursor: attackLoading ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: 14,
-              }}>{attackLoading ? 'Simulating...' : 'Simulate Attack on MockVault'}</button>
+            {/* Attack Simulator */}
+            <div className="card" style={{ borderColor: '#f43f5e44', background: 'linear-gradient(135deg, #0c0c14, #140a0a)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--red)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Attack Simulator</div>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>One-Click MockVault Exploit</h3>
+                  <p style={{ fontSize: 13, color: 'var(--text-sec)', maxWidth: 500 }}>
+                    Calls <code className="mono" style={{ color: 'var(--purple)', fontSize: 12 }}>batchWithdraw(0.001 STT × 5)</code> — auto-deposits if needed.
+                    Agents classify <strong style={{ color: 'var(--red)' }}>CRITICAL</strong> in next 5-min keeper cycle.
+                  </p>
+                </div>
+                <button className="btn btn-red" onClick={simulateAttack} disabled={attackLoading} style={{ flexShrink: 0 }}>
+                  {attackLoading ? '⏳ Simulating...' : '💥 Simulate Attack'}
+                </button>
+              </div>
               {attackStatus && (
-                <div style={{ marginTop: 12, padding: '10px 14px', background: '#060d16', borderRadius: 6, borderLeft: '3px solid #ff4444' }}>
-                  {attackStatus.split('\n').filter(l => l !== 'CHECK_ALERT_LOG').map((line, i) => (
-                    <p key={i} style={{ margin: '2px 0', fontSize: 13, color: line.startsWith('CRITICAL') ? '#ff6666' : '#22ff88' }}>{line}</p>
-                  ))}
-                  {attackStatus.includes('CHECK_ALERT_LOG') && (
-                    <button onClick={() => setActiveTab('alerts')} style={{ marginTop: 8, background: '#0d2a1a', border: '1px solid #22ff88', color: '#22ff88', padding: '6px 16px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Open Alert Log Tab</button>
-                  )}
+                <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--bg-base)', borderRadius: 8, borderLeft: `3px solid ${isConfirmed ? 'var(--green)' : 'var(--red)'}` }}>
+                  <p style={{ fontSize: 13, color: isConfirmed ? 'var(--green)' : 'var(--red)', margin: '0 0 6px', fontFamily: 'var(--font-mono)' }}>{attackMsg}</p>
+                  <button onClick={() => setActiveTab('alerts')} className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 12px' }}>Open Alert Log →</button>
                 </div>
               )}
             </div>
 
-            <div style={{ background: '#0d1a2a', border: '1px solid #1e2d4a', borderRadius: 10, padding: 20, marginBottom: 24 }}>
-              <h3 style={{ color: '#22aaff', margin: '0 0 8px' }}>Register Contract for Monitoring</h3>
-              <p style={{ color: '#7a9cc0', fontSize: 13, margin: '0 0 12px' }}>Add any Somnia contract to be monitored by the autonomous agent pipeline.</p>
+            {/* Register */}
+            <div className="card">
+              <div style={{ fontSize: 11, color: 'var(--cyan)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Register Contract</div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Add to Monitoring Pipeline</h3>
+              <p style={{ fontSize: 13, color: 'var(--text-sec)', marginBottom: 12 }}>Any Somnia contract address. Autonomous agents monitor every 5 minutes.</p>
               <div style={{ display: 'flex', gap: 10 }}>
-                <input value={registerInput} onChange={e => setRegisterInput(e.target.value)}
-                  placeholder="0x... contract address"
-                  style={{ flex: 1, background: '#0a0f1a', border: '1px solid #1e2d4a', color: '#e0e8ff', padding: '8px 12px', borderRadius: 6, fontFamily: 'monospace' }} />
-                <button onClick={handleRegister} style={{ background: '#1a6cff', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold' }}>Register</button>
+                <input value={registerInput} onChange={e => setRegisterInput(e.target.value)} placeholder="0x... contract address" style={{ flex: 1 }} />
+                <button className="btn btn-purple" onClick={handleRegister}>Register</button>
               </div>
-              {registerStatus && <p style={{ marginTop: 8, fontSize: 13, color: registerStatus.startsWith('Error') ? '#ff6666' : '#22ff88' }}>{registerStatus}</p>}
+              {registerStatus && <p style={{ marginTop: 8, fontSize: 12, color: registerStatus.startsWith('Error') ? 'var(--red)' : 'var(--green)' }}>{registerStatus}</p>}
             </div>
 
-            <div style={{ marginBottom: 24 }}>
-              <h3 style={{ color: '#e0e8ff', marginBottom: 12 }}>Monitored Contracts</h3>
+            {/* Monitored list */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>Monitored Contracts</div>
               {contracts.map(addr => (
-                <div key={addr} style={{ background: '#0d1a2a', border: '1px solid #1e2d4a', borderRadius: 8, padding: '12px 16px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <code style={{ fontSize: 13 }}>{addr}</code>
-                  <a href={EXPLORER_BASE + '/address/' + addr} target="_blank" rel="noreferrer" style={{ color: '#22aaff', fontSize: 12 }}>View on Explorer</a>
+                <div key={addr} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 6 }}>
+                  <code className="mono" style={{ fontSize: 12, color: 'var(--text-primary)' }}>{addr}</code>
+                  <a href={EXPLORER_BASE + '/address/' + addr} target="_blank" rel="noreferrer" className="text-cyan" style={{ fontSize: 12 }}>Explorer ↗</a>
                 </div>
               ))}
             </div>
@@ -277,25 +296,29 @@ export default function App() {
         {activeTab === 'alerts'       && <AlertLog />}
         {activeTab === 'intel'        && (
           <div>
-            <h3 style={{ color: '#e0e8ff', marginBottom: 4 }}>Contract Threat Intelligence</h3>
-            <p style={{ color: '#7a9cc0', fontSize: 13, marginBottom: 24 }}>Auto-fetched on-chain analysis. Heuristic flags feed into agent risk classification.</p>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Contract Threat Intelligence</div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Heuristic Risk Analysis</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-sec)', marginBottom: 20 }}>Auto-fetched on-chain heuristics feed directly into the LLM Inference Agent classification.</p>
             {contracts.map(addr => <ThreatIntelCard key={addr} address={addr} explorerBase={EXPLORER_BASE} />)}
           </div>
         )}
         {activeTab === 'agents'       && <AgentExplorer explorerBase={EXPLORER_BASE} />}
-        {activeTab === 'webhooks'     && <WebhookMarketplace contracts={contracts} />}
+        {activeTab === 'playground'   && <AgentPlayground contracts={contracts} />}
         {activeTab === 'certificates' && <CertificateGallery contracts={contracts} watch={watch} cert={cert} explorerBase={EXPLORER_BASE} />}
         {activeTab === 'leaderboard'  && <Leaderboard watch={watch} explorerBase={EXPLORER_BASE} />}
         {activeTab === 'how-it-works' && <AgentFlowDiagram />}
       </div>
 
-      <footer style={{ borderTop: '1px solid #1e2d4a', padding: '16px 24px', textAlign: 'center', fontSize: 12, color: '#3a5a80' }}>
-        SomniaWatch by{' '}
-        <a href="https://x.com/GopichandAI" target="_blank" rel="noreferrer" style={{ color: '#22aaff' }}>Gopichand Challa</a>
-        {' | '}
-        <a href="https://github.com/gopichandchalla16/somniawatch" target="_blank" rel="noreferrer" style={{ color: '#22aaff' }}>GitHub</a>
-        {' | Somnia Agentathon 2026 | Contract: '}
-        <a href={EXPLORER_BASE + '/address/' + SOMNIAWATCH_ADDRESS} target="_blank" rel="noreferrer" style={{ color: '#22aaff' }}>{SOMNIAWATCH_ADDRESS.slice(0,12)}...</a>
+      <footer style={{ borderTop: '1px solid var(--border)', padding: '20px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 40 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg, var(--purple-dim), var(--cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🛡️</div>
+          <span style={{ fontSize: 13, color: 'var(--text-sec)' }}>SomniaWatch · Somnia Agentathon 2026</span>
+        </div>
+        <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+          <a href="https://x.com/GopichandAI" target="_blank" rel="noreferrer" style={{ color: 'var(--text-sec)' }}>@GopichandAI</a>
+          <a href="https://github.com/gopichandchalla16/somniawatch" target="_blank" rel="noreferrer" style={{ color: 'var(--text-sec)' }}>GitHub</a>
+          <a href={EXPLORER_BASE + '/address/' + SOMNIAWATCH_ADDRESS} target="_blank" rel="noreferrer" style={{ color: 'var(--purple)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{SOMNIAWATCH_ADDRESS.slice(0,14)}...</a>
+        </div>
       </footer>
     </div>
   );
