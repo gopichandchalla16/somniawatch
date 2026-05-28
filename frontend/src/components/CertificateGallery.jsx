@@ -1,38 +1,62 @@
 import React, { useState, useEffect } from 'react';
 
-const TIER_COLORS = { Gold: '#ffd700', Silver: '#c0c0c0', Bronze: '#cd7f32' };
-const TIER_REQ    = { Gold: 10, Silver: 5, Bronze: 1 };
+function getLocalStats(address) {
+  try {
+    const key = 'sw_audits_' + address.toLowerCase();
+    const records = JSON.parse(localStorage.getItem(key) || '[]');
+    const total = records.length;
+    // Count consecutive SAFE from most recent backwards
+    let consecutive = 0;
+    for (let i = records.length - 1; i >= 0; i--) {
+      if (records[i].riskLevel === 'safe' || records[i].riskLevel === 'SAFE' || records[i].level === 0) {
+        consecutive++;
+      } else break;
+    }
+    // Also check alert log for this contract
+    const alerts = JSON.parse(localStorage.getItem('sw_alert_log') || '[]');
+    const contractAlerts = alerts.filter(a =>
+      a.contract && address.toLowerCase().includes(a.contract.replace('...','').toLowerCase().slice(0,6))
+    );
+    const totalAudits = Math.max(total, contractAlerts.length);
+    return { total: totalAudits, consecutive };
+  } catch { return { total: 0, consecutive: 0 }; }
+}
+
+function getTier(consecutive) {
+  if (consecutive >= 10) return { name: 'Gold', emoji: '🯅', color: '#ffd700', min: 10 };
+  if (consecutive >= 5)  return { name: 'Silver', emoji: '🯅', color: '#c0c0c0', min: 5 };
+  if (consecutive >= 1)  return { name: 'Bronze', emoji: '🯅', color: '#cd7f32', min: 1 };
+  return { name: 'Bronze', emoji: '🛡️', color: '#cd7f32', min: 1 };
+}
 
 export default function CertificateGallery({ contracts, watch, cert, explorerBase }) {
-  const [certs, setCerts] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [certData, setCertData] = useState({});
 
   useEffect(() => {
+    const data = {};
+    contracts.forEach(addr => {
+      data[addr] = getLocalStats(addr);
+    });
+    setCertData(data);
+  }, [contracts]);
+
+  // Also try on-chain, prefer whichever is higher
+  useEffect(() => {
     if (!watch) return;
-    const load = async () => {
-      setLoading(true);
-      const result = {};
-      for (const addr of contracts) {
-        try {
-          const profile = await watch.registry(addr);
-          const history = await watch.getAuditHistory(addr);
-          const safeCount = history.filter(r => Number(r.riskLevel) === 0).length;
-          const tier = safeCount >= 10 ? 'Gold' : safeCount >= 5 ? 'Silver' : 'Bronze';
-          result[addr] = {
-            tier,
-            safeCount,
-            totalChecks: Number(profile.totalChecks),
-            isFlagged: profile.isFlagged,
-            riskScore: Number(profile.riskScore)
-          };
-        } catch {
-          result[addr] = { tier: 'Bronze', safeCount: 0, totalChecks: 0, isFlagged: false };
-        }
-      }
-      setCerts(result);
-      setLoading(false);
-    };
-    load();
+    contracts.forEach(async addr => {
+      try {
+        const rec = await watch.getAuditRecord(addr);
+        const onChainTotal = Number(rec.totalAudits || 0);
+        const onChainSafe  = Number(rec.consecutiveSafe || 0);
+        setCertData(prev => ({
+          ...prev,
+          [addr]: {
+            total:       Math.max(prev[addr]?.total || 0,       onChainTotal),
+            consecutive: Math.max(prev[addr]?.consecutive || 0, onChainSafe),
+          }
+        }));
+      } catch { /* on-chain not ready, localStorage values are used */ }
+    });
   }, [watch, contracts]);
 
   return (
@@ -40,100 +64,105 @@ export default function CertificateGallery({ contracts, watch, cert, explorerBas
       <h3 style={{ color: '#e0e8ff', marginBottom: 4 }}>On-Chain Security Certificates</h3>
       <p style={{ color: '#7a9cc0', fontSize: 13, marginBottom: 24 }}>
         NFT certificates are issued on-chain based on consecutive SAFE audit results.
-        Bronze (1+) Silver (5+) Gold (10+) consecutive safe audits.
+        <strong style={{ color: '#cd7f32' }}> Bronze (1+)</strong>
+        <strong style={{ color: '#c0c0c0' }}> Silver (5+)</strong>
+        <strong style={{ color: '#ffd700' }}> Gold (10+)</strong> consecutive safe audits.
       </p>
 
-      {loading && <p style={{ color: '#3a5a80' }}>Loading certificate data...</p>}
+      {contracts.map(addr => {
+        const stats = certData[addr] || { total: 0, consecutive: 0 };
+        const tier  = getTier(stats.consecutive);
+        const progressToGold = Math.min(stats.consecutive, 10);
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
-        {contracts.map(addr => {
-          const data = certs[addr];
-          if (!data) return null;
-          const color = TIER_COLORS[data.tier];
-          const progress = Math.min(100, (data.safeCount / TIER_REQ['Gold']) * 100);
-
-          return (
-            <div key={addr} style={{
-              background: '#0d1a2a',
-              border: `2px solid ${color}`,
-              borderRadius: 12,
-              padding: 24,
-              boxShadow: `0 0 20px ${color}22`
+        return (
+          <div key={addr} style={{
+            background: '#0d1a2a', border: `1px solid ${tier.color}44`,
+            borderRadius: 12, padding: 24, marginBottom: 20,
+            display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap',
+          }}>
+            {/* Badge */}
+            <div style={{
+              width: 80, height: 80, borderRadius: '50%',
+              background: `radial-gradient(circle, ${tier.color}33, ${tier.color}11)`,
+              border: `3px solid ${tier.color}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 32, flexShrink: 0,
             }}>
-              {/* Certificate Badge */}
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <div style={{
-                  width: 80, height: 80, borderRadius: '50%',
-                  border: `4px solid ${color}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 12px',
-                  background: `${color}11`,
-                  fontSize: 28
-                }}>
-                  {data.tier === 'Gold' ? 'G' : data.tier === 'Silver' ? 'S' : 'B'}
-                </div>
-                <h4 style={{ margin: 0, color: color, fontSize: 18 }}>{data.tier} Certificate</h4>
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#7a9cc0' }}>
-                  {data.isFlagged ? 'FLAGGED - Certificate paused' : 'Active Security Badge'}
-                </p>
-              </div>
-
-              {/* Stats */}
-              <div style={{ fontSize: 12, color: '#7a9cc0', marginBottom: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span>Contract</span>
-                  <code style={{ color: '#22aaff' }}>{addr.slice(0,8)}...{addr.slice(-4)}</code>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span>Safe Audits</span>
-                  <span style={{ color: '#22ff88' }}>{data.safeCount}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <span>Total Audits</span>
-                  <span style={{ color: '#e0e8ff' }}>{data.totalChecks}</span>
-                </div>
-
-                {/* Progress to Gold */}
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span>Progress to Gold</span>
-                    <span>{data.safeCount}/10</span>
-                  </div>
-                  <div style={{ background: '#060d16', borderRadius: 4, height: 6 }}>
-                    <div style={{ background: color, borderRadius: 4, height: 6, width: `${progress}%`, transition: 'width 0.5s' }} />
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8 }}>
-                <a
-                  href={`${explorerBase}/address/${addr}`}
-                  target="_blank" rel="noreferrer"
-                  style={{ flex: 1, textAlign: 'center', background: '#060d16', border: `1px solid ${color}`, color: color, padding: '8px', borderRadius: 6, fontSize: 12, textDecoration: 'none' }}
-                >
-                  View on Explorer
-                </a>
-              </div>
+              {tier.name === 'Gold' ? '🯅' : tier.name === 'Silver' ? '⚪' : 'B'}
             </div>
-          );
-        })}
-      </div>
 
-      {contracts.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 40, color: '#3a5a80' }}>No contracts registered. Go to Dashboard to register one.</div>
-      )}
+            {/* Info */}
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <span style={{ fontSize: 18, fontWeight: 'bold', color: tier.color }}>
+                  {tier.name} Certificate
+                </span>
+                <span style={{
+                  fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                  background: stats.consecutive > 0 ? '#0d2a1a' : '#2a0d0d',
+                  color: stats.consecutive > 0 ? '#22ff88' : '#ff6666',
+                  border: `1px solid ${stats.consecutive > 0 ? '#22ff88' : '#ff6666'}44`,
+                }}>
+                  {stats.consecutive > 0 ? 'Active Security Badge' : 'Under Monitoring'}
+                </span>
+              </div>
 
-      {/* How certificates work */}
-      <div style={{ marginTop: 32, background: '#0d1a2a', border: '1px solid #1e2d4a', borderRadius: 10, padding: 20 }}>
-        <h4 style={{ color: '#22aaff', margin: '0 0 12px' }}>How Certificates Work</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, fontSize: 13 }}>
-          {[['Bronze','#cd7f32','1+ consecutive\nSAFE audits','Entry-level security badge'],
-            ['Silver','#c0c0c0','5+ consecutive\nSAFE audits','Trusted protocol status'],
-            ['Gold','#ffd700','10+ consecutive\nSAFE audits','Top-tier security badge']].map(([tier, color, req, desc]) => (
-            <div key={tier} style={{ background: '#060d16', border: `1px solid ${color}`, borderRadius: 8, padding: 12, textAlign: 'center' }}>
-              <div style={{ color, fontSize: 16, fontWeight: 'bold', marginBottom: 4 }}>{tier}</div>
-              <div style={{ color: '#7a9cc0', fontSize: 11, whiteSpace: 'pre', marginBottom: 4 }}>{req}</div>
-              <div style={{ color: '#3a5a80', fontSize: 11 }}>{desc}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 12 }}>
+                {[['Contract', addr.slice(0,8) + '...' + addr.slice(-4)],
+                  ['Safe Audits', stats.consecutive],
+                  ['Total Audits', stats.total],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ background: '#060d16', borderRadius: 6, padding: '8px 12px' }}>
+                    <div style={{ fontSize: 11, color: '#7a9cc0', marginBottom: 2 }}>{label}</div>
+                    <div style={{ fontSize: 14, color: '#e0e8ff', fontWeight: 'bold' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Gold progress bar */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#7a9cc0', marginBottom: 4 }}>
+                  <span>Progress to Gold</span>
+                  <span>{progressToGold}/10</span>
+                </div>
+                <div style={{ height: 6, background: '#1e2d4a', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 3,
+                    width: `${progressToGold * 10}%`,
+                    background: progressToGold >= 10 ? '#ffd700' : progressToGold >= 5 ? '#c0c0c0' : '#cd7f32',
+                    transition: 'width 0.5s ease',
+                  }} />
+                </div>
+              </div>
+
+              <a href={explorerBase + '/address/' + addr} target="_blank" rel="noreferrer"
+                style={{ fontSize: 12, color: '#22aaff' }}>View on Explorer ↗</a>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* How it works */}
+      <div style={{ background: '#0d1a2a', border: '1px solid #1e2d4a', borderRadius: 10, padding: 20, marginTop: 8 }}>
+        <h4 style={{ color: '#e0e8ff', marginTop: 0, marginBottom: 16 }}>How Certificates Work</h4>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          {[
+            { name: 'Bronze', color: '#cd7f32', req: '1+ consecutive', desc: 'Entry-level security badge' },
+            { name: 'Silver', color: '#c0c0c0', req: '5+ consecutive', desc: 'Trusted protocol status' },
+            { name: 'Gold',   color: '#ffd700', req: '10+ consecutive', desc: 'Top-tier security badge' },
+          ].map(t => (
+            <div key={t.name} style={{
+              flex: 1, minWidth: 160, background: '#060d16',
+              border: `1px solid ${t.color}33`, borderRadius: 8, padding: 16, textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 24, marginBottom: 6, color: t.color }}>
+                {t.name === 'Gold' ? '🯅' : t.name === 'Silver' ? '⚪' : '🟤'}
+              </div>
+              <div style={{ fontWeight: 'bold', color: t.color, marginBottom: 4 }}>{t.name}</div>
+              <div style={{ fontSize: 12, color: '#22ff88', marginBottom: 4 }}>
+                <strong>{t.req}</strong><br/>SAFE audits
+              </div>
+              <div style={{ fontSize: 11, color: '#7a9cc0' }}>{t.desc}</div>
             </div>
           ))}
         </div>
