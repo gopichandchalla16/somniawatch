@@ -7,7 +7,6 @@ import AgentFlowDiagram from './components/AgentFlowDiagram';
 import AlertLog from './components/AlertLog';
 import ThreatIntelCard from './components/ThreatIntelCard';
 import WebhookMarketplace from './components/WebhookMarketplace';
-import AlertSender from './components/AlertSender';
 import SomniaWatchABI from './abi/SomniaWatch.json';
 import AuditCertABI from './abi/AuditCertificate.json';
 import {
@@ -253,11 +252,12 @@ export default function App() {
 
         {activeTab === 'webhooks' && (
           <div>
-            <h3 style={{ color: '#e0e8ff', marginBottom: 4 }}>Webhooks + Instant Alerts</h3>
-            <p style={{ color: '#7a9cc0', fontSize: 13, marginBottom: 24 }}>Send alerts directly from the UI or register webhooks for autonomous keeper delivery.</p>
-            {/* Direct alert sender - no terminal needed */}
-            <AlertSender />
-            {/* Webhook marketplace */}
+            <h3 style={{ color: '#e0e8ff', marginBottom: 4 }}>Webhook Marketplace</h3>
+            <p style={{ color: '#7a9cc0', fontSize: 13, marginBottom: 16 }}>Register alert endpoints per contract. SomniaWatch keeper fires alerts autonomously on CRITICAL detections.</p>
+            <div style={{ background: '#0d1a2a', border: '1px solid #22ff8833', borderRadius: 8, padding: '14px 18px', marginBottom: 20, fontSize: 13, color: '#7a9cc0' }}>
+              💡 <strong style={{ color: '#22ff88' }}>Alerts are sent by the keeper (Node.js backend)</strong> — never from the browser.
+              Discord + Telegram credentials live in <code>.env</code> only. The keeper fires autonomously every 5 minutes.
+            </div>
             <WebhookMarketplace contracts={contracts} />
           </div>
         )}
