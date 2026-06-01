@@ -1,32 +1,24 @@
-name: SomniaWatch Keeper - 5min Autonomous Alerts
+name: SomniaWatch Keeper
 
 on:
   schedule:
-    - cron: '*/5 * * * *'   # Every 5 minutes, 24/7, free on GitHub Actions
-  workflow_dispatch:         # Also allows manual trigger from GitHub UI
+    - cron: '*/10 * * * *'   # every 10 minutes (GitHub Actions minimum is 5)
+  workflow_dispatch:           # allows manual trigger from GitHub Actions tab
 
 jobs:
-  keeper:
+  ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
     steps:
-      - name: Trigger SomniaWatch Keeper Cron
+      - name: Trigger SomniaWatch Keeper
         run: |
           echo "Triggering SomniaWatch keeper at $(date)"
-          RESPONSE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
-            -X GET \
-            -H "Accept: application/json" \
-            "${{ secrets.KEEPER_CRON_URL }}")
-          echo "HTTP Status: $RESPONSE"
-          echo "Response body:"
-          cat /tmp/response.json
-          if [ "$RESPONSE" = "200" ]; then
-            DISCORD=$(cat /tmp/response.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('alerts',{}).get('discord','?'))" 2>/dev/null || echo 'N/A')
-            TELEGRAM=$(cat /tmp/response.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('alerts',{}).get('telegram','?'))" 2>/dev/null || echo 'N/A')
-            echo "Discord: $DISCORD"
-            echo "Telegram: $TELEGRAM"
-            echo "Keeper ran successfully!"
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://somniawatch-git-main-gopichandchalla16s-projects.vercel.app/api/keeper-cron)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "WARNING: Keeper returned non-200 status: $HTTP_CODE"
           else
-            echo "WARNING: Keeper cron returned HTTP $RESPONSE (check Vercel env vars)"
-            echo "This is a warning only - not failing the workflow"
+            echo "SUCCESS: Alerts dispatched!"
           fi
