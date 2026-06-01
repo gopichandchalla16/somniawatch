@@ -2,7 +2,14 @@
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "installCommand": "echo skip",
+  "functions": {
+    "frontend/api/*.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
   "rewrites": [
+    { "source": "/api/keeper-cron", "destination": "/frontend/api/keeper-cron" },
+    { "source": "/api/alert", "destination": "/frontend/api/alert" },
     { "source": "/((?!api/.*).*)", "destination": "/index.html" }
   ],
   "crons": [
