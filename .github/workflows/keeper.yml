@@ -2,8 +2,8 @@ name: SomniaWatch Keeper
 
 on:
   schedule:
-    - cron: '*/10 * * * *'   # every 10 minutes (GitHub Actions minimum is 5)
-  workflow_dispatch:           # allows manual trigger from GitHub Actions tab
+    - cron: '0 */6 * * *'   # every 6 hours: 00:00, 06:00, 12:00, 18:00 UTC
+  workflow_dispatch:          # manual trigger anytime from GitHub Actions tab
 
 jobs:
   ping:
@@ -11,14 +11,14 @@ jobs:
     steps:
       - name: Trigger SomniaWatch Keeper
         run: |
-          echo "Triggering SomniaWatch keeper at $(date)"
+          echo "SomniaWatch Keeper firing at $(date) UTC"
           RESPONSE=$(curl -s -w "\n%{http_code}" https://somniawatch-git-main-gopichandchalla16s-projects.vercel.app/api/keeper-cron)
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -1)
           echo "HTTP Status: $HTTP_CODE"
           echo "Response: $BODY"
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "WARNING: Keeper returned non-200 status: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "SUCCESS: Discord + Telegram alerts dispatched!"
           else
-            echo "SUCCESS: Alerts dispatched!"
+            echo "WARNING: Unexpected status $HTTP_CODE"
           fi
