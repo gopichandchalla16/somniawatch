@@ -1,13 +1,11 @@
 // Vercel Serverless Function + Cron Job
-// Runs every 5 minutes automatically on Vercel
+// Runs every day automatically on Vercel (Hobby plan)
 // Secrets read from Vercel Environment Variables (never in code)
-// POST /api/keeper-cron  (called by Vercel cron scheduler)
 
 const https = require('https');
 
 const MOCK_VAULT  = '0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B';
 const EXPLORER    = 'https://shannon-explorer.somnia.network';
-const SOMNIA_RPC  = 'https://dream-rpc.somnia.network';
 
 function httpsPost(hostname, path, body) {
   return new Promise((resolve, reject) => {
@@ -21,42 +19,24 @@ function httpsPost(hostname, path, body) {
   });
 }
 
-function httpsGet(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, { headers: { Accept: 'application/json' } }, res => {
-      let d = ''; res.on('data', c => d += c);
-      res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({}); } });
-    }).on('error', reject);
-  });
-}
-
-async function getTxNonce(address) {
-  try {
-    const body = JSON.stringify({ jsonrpc: '2.0', method: 'eth_getTransactionCount', params: [address, 'latest'], id: 1 });
-    const res  = await httpsPost('dream-rpc.somnia.network', '/', JSON.parse(body));
-    const data = JSON.parse(res.body);
-    return parseInt(data.result, 16) || 0;
-  } catch { return 0; }
-}
-
 async function sendDiscord(webhook, contract, riskType) {
   if (!webhook) return 'not_configured';
   try {
     const url  = new URL(webhook);
     const body = {
       embeds: [{
-        title: 'SOMNIAWATCH - CRITICAL ALERT',
+        title: '\uD83D\uDEA8 SOMNIAWATCH - CRITICAL ALERT',
         description:
           `**Contract:** \`${contract}\`\n` +
           `**Risk Pattern:** ${riskType}\n` +
           `**Classification:** CRITICAL\n` +
-          `**Mode:** Autonomous Vercel Cron (5-min cycle)\n` +
+          `**Mode:** Autonomous Keeper Cron\n` +
           `[View on Explorer](${EXPLORER}/address/${contract})`,
         color: 0xff2200,
         fields: [
-          { name: 'Severity',  value: 'CRITICAL',                inline: true },
-          { name: 'Pattern',   value: riskType,                  inline: true },
-          { name: 'Keeper',    value: 'Vercel Cron Autonomous',  inline: true },
+          { name: 'Severity',  value: 'CRITICAL',               inline: true },
+          { name: 'Pattern',   value: riskType,                 inline: true },
+          { name: 'Keeper',    value: 'Vercel Cron Autonomous', inline: true },
         ],
         footer: { text: 'SomniaWatch | Autonomous Security Guardian | Somnia Agentathon 2026' },
         timestamp: new Date().toISOString(),
@@ -71,26 +51,25 @@ async function sendTelegram(token, chatId, contract, riskType) {
   if (!token || !chatId) return 'not_configured';
   try {
     const text =
-      `*SOMNIAWATCH CRITICAL ALERT*\n\n` +
+      `\uD83D\uDEA8 *SOMNIAWATCH CRITICAL ALERT*\n\n` +
       `Contract: \`${contract}\`\n` +
       `Risk: *${riskType.replace(/_/g, '\\_')}*\n` +
       `Severity: *CRITICAL*\n` +
-      `Mode: Autonomous Vercel Cron\n\n` +
+      `Mode: Autonomous Keeper Cron\n\n` +
       `[View on Explorer](${EXPLORER}/address/${contract})`;
     const r      = await httpsPost('api.telegram.org', `/bot${token}/sendMessage`,
       { chat_id: chatId, text, parse_mode: 'Markdown' });
     const parsed = JSON.parse(r.body);
-    return parsed.ok ? 'sent' : `failed_${parsed.description}`;
+    return parsed.ok ? 'sent' : `failed: ${parsed.description}`;
   } catch (e) { return `error_${e.message}`; }
 }
 
 export default async function handler(req, res) {
-  // Allow Vercel cron (GET) and manual trigger (POST)
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Read secrets from Vercel Environment Variables
+  // ✅ Secrets from Vercel env vars ONLY
   const DISCORD_WEBHOOK  = process.env.DISCORD_WEBHOOK  || '';
   const TELEGRAM_TOKEN   = process.env.TELEGRAM_TOKEN   || '';
   const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
@@ -99,19 +78,6 @@ export default async function handler(req, res) {
   const riskType  = 'batchWithdraw_reentrancy_pattern';
   const timestamp = new Date().toISOString();
 
-  // Analyze contract (MockVault is always CRITICAL)
-  let txNonce = 0;
-  try { txNonce = await getTxNonce(contract); } catch { /* ignore */ }
-
-  const analysis = {
-    contract,
-    riskLevel: 'CRITICAL',
-    riskType,
-    txNonce,
-    timestamp,
-  };
-
-  // Fire alerts
   const [discordResult, telegramResult] = await Promise.all([
     sendDiscord(DISCORD_WEBHOOK, contract, riskType),
     sendTelegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, contract, riskType),
@@ -120,7 +86,8 @@ export default async function handler(req, res) {
   const result = {
     ok: true,
     timestamp,
-    analysis,
+    contract,
+    riskLevel: 'CRITICAL',
     alerts: {
       discord:  discordResult,
       telegram: telegramResult,
@@ -131,6 +98,6 @@ export default async function handler(req, res) {
     },
   };
 
-  console.log('SomniaWatch Cron:', JSON.stringify(result));
+  console.log('SomniaWatch Keeper Cron:', JSON.stringify(result));
   return res.status(200).json(result);
 }
