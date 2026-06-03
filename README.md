@@ -9,7 +9,7 @@
 
 [![Live Demo](https://img.shields.io/badge/🌐%20Live%20App-somniawatch--eight.vercel.app-22ff88?style=for-the-badge&logoColor=white)](https://somniawatch-eight.vercel.app)
 [![Demo Video](https://img.shields.io/badge/🎬%20Demo%20Video-Watch%20Now-ff0000?style=for-the-badge)](https://youtube.com/YOUR_VIDEO_LINK)
-[![Presentation](https://img.shields.io/badge/📊%20Slides-View%20on%20Canva-7c3aed?style=for-the-badge)](https://canva.com/YOUR_PRESENTATION_LINK)
+[![Presentation](https://img.shields.io/badge/📊%20Slides-View%20Presentation-7c3aed?style=for-the-badge)](https://docs.google.com/presentation/d/1aB9s72xFDSyNdE_oMvt5QFXwrSRoagoT/edit?usp=sharing)
 [![Somnia Agentathon 2026](https://img.shields.io/badge/Somnia-Agentathon%202026-06b6d4?style=for-the-badge)](https://www.encodeclub.com/programmes/agentathon)
 
 </div>
@@ -22,7 +22,7 @@
 |---|---|
 | 🌐 **Live Application** | [somniawatch-eight.vercel.app](https://somniawatch-eight.vercel.app) |
 | 🎬 **Demo Video** | [Watch on YouTube](https://youtube.com/YOUR_VIDEO_LINK) |
-| 📊 **Pitch Deck** | [View on Canva](https://canva.com/YOUR_PRESENTATION_LINK) |
+| 📊 **Pitch Deck** | [View Presentation on Google Slides](https://docs.google.com/presentation/d/1aB9s72xFDSyNdE_oMvt5QFXwrSRoagoT/edit?usp=sharing) |
 | 💻 **Source Code** | [github.com/gopichandchalla16/somniawatch](https://github.com/gopichandchalla16/somniawatch) |
 | 🔗 **SomniaWatch.sol** | [`0x21845ed6C3A3268AFAC41f42244436C7662fd03d`](https://shannon-explorer.somnia.network/address/0x21845ed6C3A3268AFAC41f42244436C7662fd03d) |
 | 🔗 **MockVault.sol** | [`0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B`](https://shannon-explorer.somnia.network/address/0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B) |
@@ -48,7 +48,7 @@ Existing security tools are either **off-chain and centralized** (Forta, OpenZep
 
 ## 🛡️ The Solution: SomniaWatch
 
-SomniaWatch is a **fully autonomous smart contract security guardian** built natively on **Somnia’s Agentic L1**. It uses three chained Somnia Agents to fetch, reason, and classify contract risk every 5 minutes — with no human in the loop.
+SomniaWatch is a **fully autonomous smart contract security guardian** built natively on **Somnia's Agentic L1**. It uses three chained Somnia Agents to fetch, reason, and classify contract risk every 5 minutes — with no human in the loop.
 
 ```
 Every 5 minutes, automatically:
@@ -113,7 +113,7 @@ The raw HTML is converted to Markdown, then the LLM extracts a typed risk summar
 
 ### Agent 3 — LLM Inference (`inferString()`)
 
-The third agent is the reasoning core. It receives the structured output from Agents 1 and 2, and classifies the contract’s current risk state:
+The third agent is the reasoning core. It receives the structured output from Agents 1 and 2, and classifies the contract's current risk state:
 
 ```
 Input:  "Contract 0xEC263eBB: 18 TXs in 100 blocks.
@@ -130,7 +130,7 @@ Receipt: req_llm_4729384756 → stored on-chain
 
 The `allowedValues` constraint eliminates hallucination — the model cannot return anything outside `["SAFE", "SUSPICIOUS", "CRITICAL"]`. This is a key Somnia Agent design pattern that SomniaWatch uses to make LLM output **safe for on-chain consumption**.
 
-> *Real-world parallel: This is On-Chain D&D — every classification decision is the LLM acting as Dungeon Master, ruling on the contract’s fate with immutable on-chain receipts.*
+> *Real-world parallel: This is On-Chain D&D — every classification decision is the LLM acting as Dungeon Master, ruling on the contract's fate with immutable on-chain receipts.*
 
 ---
 
@@ -141,11 +141,11 @@ False positives are the enemy of any security system. SomniaWatch solves this wi
 **How it works:**
 
 1. A CRITICAL audit is recorded on-chain by the keeper
-2. The monitored protocol’s team sees the alert on Discord/Telegram
+2. The monitored protocol's team sees the alert on Discord/Telegram
 3. They open the Sphinx tab in SomniaWatch and write a defense argument:
-   > *“This batchWithdraw was an authorized DAO treasury rebalancing. The 8 calls were from our multisig 0x... as confirmed in governance vote #142.”*
+   > *"This batchWithdraw was an authorized DAO treasury rebalancing. The 8 calls were from our multisig 0x... as confirmed in governance vote #142."*
 4. The argument is submitted to `inferString()` with `allowedValues: ["0"..."100"]`
-5. Qwen3-30B scores the argument’s legitimacy (0–100) through 3-validator consensus
+5. Qwen3-30B scores the argument's legitimacy (0–100) through 3-validator consensus
 6. The score is recorded on-chain with a receipt ID:
    - **Score ≥ 75** → **SAFE OVERRIDE** — alert suppressed, audit reclassified
    - **Score < 75** → **CRITICAL CONFIRMED** — Discord + Telegram fire, finding stands
@@ -156,7 +156,7 @@ This gives protocols a **trustless appeal mechanism** — not a human moderator,
 
 ## 🐣 Tamagotchi Guardian: The Living NFT Certificate
 
-SomniaWatch issues **on-chain NFT certificates** to contracts that maintain clean security records. But unlike static badges, these certificates are **living guardians** — powered by Somnia’s inference agent.
+SomniaWatch issues **on-chain NFT certificates** to contracts that maintain clean security records. But unlike static badges, these certificates are **living guardians** — powered by Somnia's inference agent.
 
 **Tier progression:**
 
@@ -166,11 +166,11 @@ SomniaWatch issues **on-chain NFT certificates** to contracts that maintain clea
 | ⚪ Silver | 5+ consecutive SAFE audits | Trusted by the guardian |
 | 🏆 Gold | 10+ consecutive SAFE audits | Top-tier security record |
 
-**The guardian speaks.** Every NFT certificate has a **Speak** button that calls `inferString()` in real-time. The Qwen3-30B model generates a live status report from the guardian’s perspective:
+**The guardian speaks.** Every NFT certificate has a **Speak** button that calls `inferString()` in real-time. The Qwen3-30B model generates a live status report from the guardian's perspective:
 
-> *“Guardian status: ACTIVE. I have completed 10 audit cycles on this contract. My consecutive SAFE record is intact. I am evolving toward Gold tier. My judgment is trusted by the Somnia validator network.”*
+> *"Guardian status: ACTIVE. I have completed 10 audit cycles on this contract. My consecutive SAFE record is intact. I am evolving toward Gold tier. My judgment is trusted by the Somnia validator network."*
 
-Each speech response generates an on-chain receipt ID. The guardian’s health bar degrades on any CRITICAL finding — simulating the same consequence mechanic as a Tamagotchi that needs care to thrive.
+Each speech response generates an on-chain receipt ID. The guardian's health bar degrades on any CRITICAL finding — simulating the same consequence mechanic as a Tamagotchi that needs care to thrive.
 
 This turns **security compliance into a gamified, social signal** — protocols display their Gold guardian as proof of sustained security to users and investors.
 
@@ -185,7 +185,7 @@ This turns **security compliance into a gamified, social signal** — protocols 
 │                                                                   │
 │   TRIGGER LAYER                                                   │
 │   ├─ Vercel Cron        ── /api/keeper-cron  (every 5 min)       │
-│   └─ GitHub Actions     ── keeper.yml        (every 5 min)       │
+│   └─ GitHub Actions     ── keeper.yml        (every 6 hours)     │
 │                                    │                              │
 │   AGENT PIPELINE                   │                              │
 │   ├─ fetchString()    ←─────────┘  Somnia JSON API Agent      │
@@ -245,7 +245,7 @@ All 3 agents run with **3-validator consensus** — no single point of failure, 
 
 | Feature | What It Does | Why It Matters |
 |---|---|---|
-| 🤖 **Autonomous Keeper** | Vercel Cron + GitHub Actions run every 5 min, zero intervention | Truly autonomous — not a demo |
+| 🤖 **Autonomous Keeper** | Vercel Cron + GitHub Actions run automatically, zero intervention | Truly autonomous — not a demo |
 | 💥 **Attack Simulator** | One-click `batchWithdraw` reentrancy on live MockVault | Live proof the detection works |
 | 🦁 **Sphinx Protocol** | CRITICAL findings challenged via LLM Judge, scored 0–100 | Trustless false-positive resolution |
 | 🐣 **Tamagotchi Guardian** | NFT that levels up, degrades, and speaks via `inferString()` | Gamified security compliance signal |
@@ -268,10 +268,10 @@ A lending protocol on Somnia registers its vault contract with SomniaWatch. Ever
 A new DEX launching on Somnia runs SomniaWatch for 30 days before launch. After 10 consecutive SAFE audits, their contract earns a **Gold NFT Certificate** — publicly verifiable on-chain proof of sustained security. They display it in their app UI and documentation as a trust signal to users.
 
 ### DAO Treasury Monitoring
-A Somnia DAO registers its multisig treasury with SomniaWatch. Any unusual spending pattern triggers a CRITICAL alert. The DAO’s security committee uses the **Sphinx Protocol** to challenge false positives — writing an on-chain argument that the LLM Judge verifies as legitimate before suppressing the alert.
+A Somnia DAO registers its multisig treasury with SomniaWatch. Any unusual spending pattern triggers a CRITICAL alert. The DAO's security committee uses the **Sphinx Protocol** to challenge false positives — writing an on-chain argument that the LLM Judge verifies as legitimate before suppressing the alert.
 
 ### Developer Testing & Audit Simulation
-A developer deploying a new contract uses SomniaWatch’s **Attack Simulator** to test detection sensitivity before going live. They simulate reentrancy attacks and watch the 3-agent pipeline classify them in real time, confirming their contract’s behavior is correctly analyzed before mainnet.
+A developer deploying a new contract uses SomniaWatch's **Attack Simulator** to test detection sensitivity before going live. They simulate reentrancy attacks and watch the 3-agent pipeline classify them in real time, confirming their contract's behavior is correctly analyzed before mainnet.
 
 ---
 
@@ -326,7 +326,7 @@ SOMNIA_RPC=https://dream-rpc.somnia.network
 
 > Most hackathon teams call **1 Somnia agent**. SomniaWatch chains **all 3**, deploys **3 smart contracts**, ships **8 production UI tabs**, fires **real Discord and Telegram alerts**, implements a **trustless LLM challenge system**, and runs **two independent autonomous keeper mechanisms** simultaneously.
 
-| Judging Criterion | SomniaWatch’s Answer |
+| Judging Criterion | SomniaWatch's Answer |
 |---|---|
 | **Agent Composability** | 3 agents chained in sequence: fetchString → parseWebsite → inferString |
 | **Real-World Utility** | Live security monitoring for any deployed Somnia contract |
