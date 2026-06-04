@@ -43,7 +43,7 @@ async function main() {
   // ── 2. Deploy SomniaWatch ───────────────────────────────────────────
   console.log("2️⃣  Deploying SomniaWatch...");
   const SomniaWatch = await ethers.getContractFactory("SomniaWatch");
-  const watch = await SomniaWatch.deploy(PLATFORM);
+  const watch = await SomniaWatch.deploy(PLATFORM, BigInt("12875401142070969085"));
   await watch.waitForDeployment();
   const watchAddr = await watch.getAddress();
   console.log(`   ✓ SomniaWatch deployed: ${watchAddr}\n`);
