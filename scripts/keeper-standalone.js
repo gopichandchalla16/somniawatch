@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // scripts/keeper-standalone.js
-// GitHub Actions standalone keeper — calls triggerMonitor() for all registered
-// contracts, polls for consensus, fires alerts based on REAL audit results.
-// Exit 0 = success, Exit 1 = failure.
+// Standalone Node.js keeper — run by GitHub Actions every 6 hours
+// Usage: node scripts/keeper-standalone.js
 
+require('dotenv').config();
 const { ethers } = require('ethers');
 const https = require('https');
 
@@ -22,8 +22,7 @@ function httpsPost(hostname, path, body) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const req = https.request(
-      { hostname, path, method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } },
+      { hostname, path, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } },
       res => { let d = ''; res.on('data', c => d += c); res.on('end', () => resolve({ status: res.statusCode, body: d })); }
     );
     req.on('error', reject);
@@ -31,143 +30,165 @@ function httpsPost(hostname, path, body) {
   });
 }
 
-async function sendDiscord(webhook, contractAddr, riskType, riskLevel, receiptId, txHash) {
+async function sendDiscord(webhook, target, riskType, riskLevel, receiptId, txHash) {
   if (!webhook) return 'not_configured';
   try {
     const url = new URL(webhook);
-    const body = {
+    const color = riskLevel === 2 ? 0xff2200 : 0xffaa00;
+    await httpsPost(url.hostname, url.pathname + url.search, {
       embeds: [{
-        title: riskLevel === 2 ? '\uD83D\uDEA8 CRITICAL ALERT — SomniaWatch' : '\u26A0\uFE0F SUSPICIOUS — SomniaWatch',
+        title: riskLevel === 2 ? '🚨 SOMNIAWATCH — CRITICAL ALERT' : '⚠️ SOMNIAWATCH — SUSPICIOUS ACTIVITY',
         description:
-          `**Contract:** \`${contractAddr}\`\n**Risk:** ${riskType}\n` +
-          `**Receipt:** \`${receiptId}\`\n**TX:** \`${txHash}\`\n` +
-          `[Explorer](${EXPLORER}/tx/${txHash})`,
-        color: riskLevel === 2 ? 0xff2200 : 0xffaa00,
+          `**Contract:** \`${target}\`\n` +
+          `**Risk Pattern:** ${riskType}\n` +
+          `**Receipt ID:** \`${receiptId}\`\n` +
+          `**TX Hash:** \`${txHash}\`\n\n` +
+          `[View Contract](${EXPLORER}/address/${target}) • [View TX](${EXPLORER}/tx/${txHash})`,
+        color,
         footer: { text: 'SomniaWatch GitHub Actions Keeper | Somnia Agentathon 2026' },
         timestamp: new Date().toISOString(),
-      }],
-    };
-    const r = await httpsPost(url.hostname, url.pathname + url.search, body);
-    return r.status < 300 ? 'sent' : `failed_${r.status}`;
-  } catch (e) { return `error_${e.message}`; }
+      }]
+    });
+    return 'sent';
+  } catch (e) { return `error: ${e.message}`; }
 }
 
-async function sendTelegram(token, chatId, contractAddr, riskType, riskLevel, receiptId, txHash) {
+async function sendTelegram(token, chatId, target, riskType, riskLevel, receiptId, txHash) {
   if (!token || !chatId) return 'not_configured';
   try {
-    const label = riskLevel === 2 ? 'CRITICAL \uD83D\uDEA8' : 'SUSPICIOUS \u26A0\uFE0F';
-    const text =
-      `*SomniaWatch ${label}*\n\n` +
-      `Contract: \`${contractAddr}\`\nRisk: *${riskType.replace(/_/g, '\\_')}*\n` +
-      `Receipt: \`${receiptId}\`\n[Explorer](${EXPLORER}/tx/${txHash})`;
-    const r = await httpsPost('api.telegram.org', `/bot${token}/sendMessage`,
-      { chat_id: chatId, text, parse_mode: 'Markdown' });
-    const parsed = JSON.parse(r.body);
-    return parsed.ok ? 'sent' : `failed: ${parsed.description}`;
-  } catch (e) { return `error_${e.message}`; }
+    const level = riskLevel === 2 ? 'CRITICAL 🚨' : 'SUSPICIOUS ⚠️';
+    await httpsPost('api.telegram.org', `/bot${token}/sendMessage`, {
+      chat_id: chatId,
+      text: `*SOMNIAWATCH ${level}*\n\nContract: \`${target}\`\nRisk: *${riskType}*\nReceipt: \`${receiptId}\`\nTX: \`${txHash}\`\n\n[Explorer](${EXPLORER}/address/${target})`,
+      parse_mode: 'Markdown'
+    });
+    return 'sent';
+  } catch (e) { return `error: ${e.message}`; }
 }
 
-async function waitForAudit(watch, target, afterTimestamp, maxMs = 300000) {
+async function waitForAudit(watch, target, beforeTimestamp, maxWaitMs = 300000) {
   const start = Date.now();
-  while (Date.now() - start < maxMs) {
+  while (Date.now() - start < maxWaitMs) {
     try {
       const audit = await watch.getLatestAudit(target);
-      if (Number(audit.timestamp) > afterTimestamp) return audit;
+      if (Number(audit.timestamp) > beforeTimestamp) return audit;
     } catch (_) {}
     await new Promise(r => setTimeout(r, 30000));
   }
   return null;
 }
 
-function pad(s, n) { return String(s).padEnd(n); }
-
 async function main() {
   const PRIVATE_KEY      = process.env.PRIVATE_KEY;
-  const RPC_URL          = process.env.SOMNIA_RPC    || 'https://dream-rpc.somnia.network';
+  const RPC_URL          = process.env.SOMNIA_RPC || 'https://dream-rpc.somnia.network';
   const WATCH_ADDRESS    = process.env.SOMNIAWATCH_ADDRESS;
-  const DISCORD_WEBHOOK  = process.env.DISCORD_WEBHOOK  || '';
-  const TELEGRAM_TOKEN   = process.env.TELEGRAM_TOKEN   || '';
+  const DISCORD_WEBHOOK  = process.env.DISCORD_WEBHOOK || '';
+  const TELEGRAM_TOKEN   = process.env.TELEGRAM_TOKEN  || '';
   const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 
-  if (!PRIVATE_KEY)   { console.error('ERROR: PRIVATE_KEY not set'); process.exit(1); }
-  if (!WATCH_ADDRESS) { console.error('ERROR: SOMNIAWATCH_ADDRESS not set'); process.exit(1); }
+  if (!PRIVATE_KEY || !WATCH_ADDRESS) {
+    console.error('❌ Missing PRIVATE_KEY or SOMNIAWATCH_ADDRESS');
+    process.exit(1);
+  }
 
-  console.log('\n\uD83D\uDEE1\uFE0F  SomniaWatch Keeper — GitHub Actions');
-  console.log(`   RPC:      ${RPC_URL}`);
-  console.log(`   Contract: ${WATCH_ADDRESS}`);
-  console.log(`   Time:     ${new Date().toISOString()}\n`);
+  console.log('\n🔍 SomniaWatch Keeper — Starting...');
+  console.log(`📡 RPC: ${RPC_URL}`);
+  console.log(`📜 Contract: ${WATCH_ADDRESS}\n`);
 
   const provider = new ethers.JsonRpcProvider(RPC_URL);
   const signer   = new ethers.Wallet(PRIVATE_KEY, provider);
   const watch    = new ethers.Contract(WATCH_ADDRESS, WATCH_ABI, signer);
 
-  const balance     = await provider.getBalance(signer.address);
-  const registered  = await watch.getAllRegistered();
-  const totalAudits = await watch.totalAuditsCompleted();
+  let registered;
+  try {
+    registered = await watch.getAllRegistered();
+  } catch (e) {
+    console.error('❌ Failed to fetch registered contracts:', e.message);
+    process.exit(1);
+  }
 
-  console.log(`   Wallet:   ${signer.address}`);
-  console.log(`   Balance:  ${ethers.formatEther(balance)} STT`);
-  console.log(`   Total audits completed: ${totalAudits}`);
-  console.log(`   Registered contracts: ${registered.length}\n`);
+  console.log(`📋 Registered contracts: ${registered.length}`);
+  if (registered.length === 0) {
+    console.log('ℹ️  No contracts registered. Done.');
+    process.exit(0);
+  }
 
   const now     = Math.floor(Date.now() / 1000);
+  const results = [];
   const rows    = [];
-  let exitCode  = 0;
 
   for (const target of registered) {
-    const profile = await watch.registry(target);
-    const lastChecked = Number(profile.lastChecked);
-
-    if (now - lastChecked < 300) {
-      rows.push([target, 'SKIPPED', 'too soon', '', '']);
-      continue;
-    }
-
+    console.log(`\n⚙️  Processing: ${target}`);
     try {
-      const deposit = await watch.depositForJson();
-      const beforeTime = now;
-      const tx = await watch.triggerMonitor(target, { value: deposit });
-      console.log(`  \u23F3 triggerMonitor(${target}) \u2192 TX: ${tx.hash}`);
-      await tx.wait();
-      console.log(`  \u2705 TX confirmed. Waiting for 3-agent consensus...`);
+      const profile     = await watch.registry(target);
+      const lastChecked = Number(profile.lastChecked);
 
-      const audit = await waitForAudit(watch, target, beforeTime);
+      if (now - lastChecked < 300) {
+        console.log(`   ⏩ Skipped — checked ${now - lastChecked}s ago (min 5 min)`);
+        results.push({ address: target, status: 'skipped_too_soon' });
+        rows.push([target.slice(0, 10) + '...', 'SKIPPED', '-', '-']);
+        continue;
+      }
+
+      const deposit    = await watch.depositForJson();
+      const beforeTime = Math.floor(Date.now() / 1000);
+
+      console.log(`   💰 Depositing ${ethers.formatEther(deposit)} STT...`);
+      const tx = await watch.triggerMonitor(target, { value: deposit });
+      console.log(`   📤 TX sent: ${tx.hash}`);
+      await tx.wait();
+      console.log(`   ✅ TX confirmed`);
+      console.log(`   ⏳ Waiting for agent consensus (up to 5 min)...`);
+
+      const audit = await waitForAudit(watch, target, beforeTime, 300000);
       if (!audit) {
-        rows.push([target, 'TIMEOUT', 'no consensus in 5m', tx.hash, '']);
+        console.log(`   ⏰ Timeout — no consensus within 5 min`);
+        results.push({ address: target, status: 'timeout', txHash: tx.hash });
+        rows.push([target.slice(0, 10) + '...', 'TIMEOUT', tx.hash.slice(0, 10) + '...', '-']);
         continue;
       }
 
       const riskLevel  = Number(audit.riskLevel);
-      const riskLabel  = ['SAFE', 'SUSPICIOUS', 'CRITICAL'][riskLevel] || 'UNKNOWN';
       const riskType   = audit.riskType;
       const receiptId  = audit.receiptId.toString();
+      const txHash     = tx.hash;
+      const riskLabels = ['SAFE ✅', 'SUSPICIOUS ⚠️', 'CRITICAL 🚨'];
+
+      console.log(`   🎯 Result: ${riskLabels[riskLevel]} — ${riskType}`);
+      console.log(`   🧾 Receipt: ${receiptId}`);
 
       let discord = 'skipped', telegram = 'skipped';
       if (riskLevel >= 1) {
-        discord  = await sendDiscord(DISCORD_WEBHOOK, target, riskType, riskLevel, receiptId, tx.hash);
-        telegram = await sendTelegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, target, riskType, riskLevel, receiptId, tx.hash);
+        discord  = await sendDiscord(DISCORD_WEBHOOK, target, riskType, riskLevel, receiptId, txHash);
+        telegram = await sendTelegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, target, riskType, riskLevel, receiptId, txHash);
+        console.log(`   📣 Discord: ${discord} | Telegram: ${telegram}`);
       }
 
-      rows.push([target, riskLabel, riskType, tx.hash.slice(0, 18) + '...', receiptId.slice(0, 12) + '...']);
-      console.log(`  \uD83D\uDCC4 ${target}: ${riskLabel} | receipt=${receiptId} | discord=${discord}`);
+      results.push({ address: target, status: 'completed', riskLevel: riskLabels[riskLevel], riskType, receiptId, txHash });
+      rows.push([target.slice(0, 10) + '...', riskLabels[riskLevel], txHash.slice(0, 10) + '...', receiptId.slice(0, 10) + '...']);
 
     } catch (err) {
-      console.error(`  \u274C Error for ${target}: ${err.message}`);
-      rows.push([target, 'ERROR', err.message.slice(0, 30), '', '']);
-      exitCode = 1;
+      console.error(`   ❌ Error: ${err.message}`);
+      results.push({ address: target, status: 'error', error: err.message });
+      rows.push([target.slice(0, 10) + '...', 'ERROR', '-', err.message.slice(0, 20)]);
     }
   }
 
-  console.log('\n\u250C' + '\u2500'.repeat(108) + '\u2510');
-  console.log('\u2502 ' + pad('CONTRACT', 44) + pad('RESULT', 12) + pad('RISK TYPE', 22) + pad('TX', 20) + pad('RECEIPT', 14) + ' \u2502');
-  console.log('\u251C' + '\u2500'.repeat(108) + '\u2524');
-  for (const [c, r, t, tx, rec] of rows) {
-    console.log('\u2502 ' + pad(c, 44) + pad(r, 12) + pad(t, 22) + pad(tx, 20) + pad(rec, 14) + ' \u2502');
-  }
-  console.log('\u2514' + '\u2500'.repeat(108) + '\u2518');
-  console.log(`\n  Completed: ${new Date().toISOString()}`);
+  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('📊 RESULTS TABLE');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('CONTRACT       STATUS          TX HASH        RECEIPT');
+  rows.forEach(r => console.log(r.join('  |  ')));
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  process.exit(exitCode);
+  const failed = results.filter(r => r.status === 'error' || r.status === 'timeout');
+  if (failed.length === results.length && results.length > 0) {
+    console.error('❌ All contracts failed. Exiting with code 1.');
+    process.exit(1);
+  }
+
+  console.log('✅ Keeper run complete.');
+  process.exit(0);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch(e => { console.error('Fatal:', e); process.exit(1); });

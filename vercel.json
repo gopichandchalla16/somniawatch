@@ -1,14 +1,14 @@
 {
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "installCommand": "echo skip",
+  "installCommand": "npm install",
   "rewrites": [
-    { "source": "/((?!api/.*).*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "crons": [
     {
       "path": "/api/keeper-cron",
-      "schedule": "0 0 * * *"
+      "schedule": "0 */6 * * *"
     }
   ]
 }

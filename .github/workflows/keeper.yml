@@ -2,23 +2,44 @@ name: SomniaWatch Keeper
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # every 6 hours: 00:00, 06:00, 12:00, 18:00 UTC
-  workflow_dispatch:          # manual trigger anytime from GitHub Actions tab
+    # Every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Manual trigger reason'
+        required: false
+        default: 'Manual run'
 
 jobs:
-  ping:
+  keeper:
+    name: Run Autonomous Keeper
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-      - name: Trigger SomniaWatch Keeper
-        run: |
-          echo "SomniaWatch Keeper firing at $(date) UTC"
-          RESPONSE=$(curl -s -w "\n%{http_code}" https://somniawatch-git-main-gopichandchalla16s-projects.vercel.app/api/keeper-cron)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -1)
-          echo "HTTP Status: $HTTP_CODE"
-          echo "Response: $BODY"
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "SUCCESS: Discord + Telegram alerts dispatched!"
-          else
-            echo "WARNING: Unexpected status $HTTP_CODE"
-          fi
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run keeper (real on-chain agent calls)
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          SOMNIA_RPC: ${{ secrets.SOMNIA_RPC }}
+          SOMNIAWATCH_ADDRESS: ${{ secrets.SOMNIAWATCH_ADDRESS }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node scripts/keeper-standalone.js
+
+      - name: Report status
+        if: always()
+        run: echo "Keeper run completed at $(date -u)"
