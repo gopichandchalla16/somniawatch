@@ -1,1 +1,198 @@
-[]
+[
+  {
+    "inputs": [{"internalType": "address", "name": "_somniaWatch", "type": "address"}],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
+      {"indexed": true, "internalType": "address", "name": "contractAddr", "type": "address"},
+      {"indexed": false, "internalType": "uint8", "name": "level", "type": "uint8"},
+      {"indexed": false, "internalType": "uint256", "name": "receipt", "type": "uint256"}
+    ],
+    "name": "CertificateMinted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
+      {"indexed": true, "internalType": "address", "name": "contractAddr", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "receipt", "type": "uint256"}
+    ],
+    "name": "CertificateRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
+      {"indexed": false, "internalType": "uint8", "name": "newLevel", "type": "uint8"}
+    ],
+    "name": "CertificateUpgraded",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "BRONZE_THRESHOLD",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "SILVER_THRESHOLD",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "GOLD_THRESHOLD",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "name": "certificates",
+    "outputs": [
+      {"internalType": "address", "name": "contractAddress", "type": "address"},
+      {"internalType": "address", "name": "owner", "type": "address"},
+      {"internalType": "uint8", "name": "level", "type": "uint8"},
+      {"internalType": "uint256", "name": "consecutiveSafe", "type": "uint256"},
+      {"internalType": "uint256", "name": "issuedAt", "type": "uint256"},
+      {"internalType": "uint256", "name": "lastAuditReceipt", "type": "uint256"},
+      {"internalType": "bool", "name": "isRevoked", "type": "bool"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "name": "contractToToken",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "contractAddr", "type": "address"}],
+    "name": "getCertificate",
+    "outputs": [
+      {
+        "components": [
+          {"internalType": "address", "name": "contractAddress", "type": "address"},
+          {"internalType": "address", "name": "owner", "type": "address"},
+          {"internalType": "uint8", "name": "level", "type": "uint8"},
+          {"internalType": "uint256", "name": "consecutiveSafe", "type": "uint256"},
+          {"internalType": "uint256", "name": "issuedAt", "type": "uint256"},
+          {"internalType": "uint256", "name": "lastAuditReceipt", "type": "uint256"},
+          {"internalType": "bool", "name": "isRevoked", "type": "bool"}
+        ],
+        "internalType": "struct AuditCertificate.Certificate",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "contractAddr", "type": "address"}],
+    "name": "hasCertificate",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
+    "name": "getOwnerCertificates",
+    "outputs": [{"internalType": "uint256[]", "name": "", "type": "uint256[]"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "tokenURI",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalSupply",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nextTokenId",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "contractAddr", "type": "address"},
+      {"internalType": "address", "name": "owner", "type": "address"},
+      {"internalType": "uint256", "name": "consecutiveSafe", "type": "uint256"},
+      {"internalType": "uint256", "name": "agentReceipt", "type": "uint256"}
+    ],
+    "name": "mintCertificate",
+    "outputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "contractAddr", "type": "address"},
+      {"internalType": "uint256", "name": "newConsecutiveSafe", "type": "uint256"},
+      {"internalType": "uint256", "name": "agentReceipt", "type": "uint256"}
+    ],
+    "name": "upgradeCertificate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "contractAddr", "type": "address"},
+      {"internalType": "uint256", "name": "agentReceipt", "type": "uint256"}
+    ],
+    "name": "revokeCertificate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "newWatch", "type": "address"}],
+    "name": "updateSomniaWatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "somniaWatch",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "admin",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "name": "tokenOwner",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

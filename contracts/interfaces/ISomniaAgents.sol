@@ -24,22 +24,22 @@ enum ResponseStatus {
 
 /// @notice A single validator's response to an agent request
 struct Response {
-    address        validator;     // Validator node address
-    bytes          result;        // ABI-encoded result bytes
-    ResponseStatus status;        // This validator's status
-    uint256        receipt;       // Validator's execution receipt
-    uint256        timestamp;     // When this response was submitted
-    uint256        executionCost; // Gas cost of execution
+    address        validator;
+    bytes          result;
+    ResponseStatus status;
+    uint256        receipt;
+    uint256        timestamp;
+    uint256        executionCost;
 }
 
 /// @notice Full request details stored by the platform
 struct Request {
     uint256        id;
-    address        requester;        // Contract that created this request
-    address        callbackAddress;  // Where to call back with result
-    bytes4         callbackSelector; // Which function to call
-    address[]      subcommittee;     // Selected validator nodes
-    Response[]     responses;        // All collected responses
+    address        requester;
+    address        callbackAddress;
+    bytes4         callbackSelector;
+    address[]      subcommittee;
+    Response[]     responses;
     uint256        responseCount;
     uint256        failureCount;
     uint256        threshold;
@@ -58,11 +58,6 @@ struct Request {
 
 interface IAgentRequester {
     /// @notice Create a request to a Somnia Agent
-    /// @param agentId          uint256 agent ID from agents.somnia.network
-    /// @param callbackAddress  Contract address to receive the result
-    /// @param callbackSelector 4-byte selector of the callback function
-    /// @param payload          ABI-encoded agent method call
-    /// @return requestId       Unique ID — store this as your on-chain receipt
     function createRequest(
         uint256        agentId,
         address        callbackAddress,
@@ -70,8 +65,7 @@ interface IAgentRequester {
         bytes calldata payload
     ) external payable returns (uint256 requestId);
 
-    /// @notice Returns the minimum platform reserve (operations floor)
-    /// @dev Add (COST_PER_AGENT * SUBCOMMITTEE_SIZE) on top for execution reward
+    /// @notice Returns the minimum platform reserve
     function getRequestDeposit() external view returns (uint256);
 }
 
@@ -83,12 +77,28 @@ interface IAgentRequester {
 
 interface IJsonApiAgent {
     /// @notice Fetch a string value from a public JSON API
-    /// @param url      Full URL to fetch
-    /// @param selector JSONPath-style selector for the value to extract
-    /// @return         Extracted string value
     function fetchString(
         string memory url,
         string memory selector
+    ) external returns (string memory);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  LLM PARSE AGENT (parseWebsite)
+//  ID:   SET_FROM_agents.somnia.network — look up "LLM Parse Agent" or
+//        "Website Parse Agent" on agents.somnia.network and set below.
+//        Placeholder: 0 — use setSomniaParseAgentId() setter to update.
+//  Cost: 0.12 SOMI per agent × 3 validators = 0.36 SOMI total
+// ═══════════════════════════════════════════════════════════════════════
+
+interface ILLMParseAgent {
+    /// @notice Scrape a website and extract structured data via LLM
+    /// @param url              Full URL to scrape
+    /// @param extractionPrompt Natural language instruction for what to extract
+    /// @return                 Extracted data as a string
+    function parseWebsite(
+        string memory url,
+        string memory extractionPrompt
     ) external returns (string memory);
 }
 
@@ -97,18 +107,15 @@ interface IJsonApiAgent {
 //  ID:    12847293847561029384
 //  Model: Qwen3-30B
 //  Cost:  0.07 SOMI per agent × 3 validators = 0.21 SOMI + reserve = 0.24 SOMI
-//
-//  KEY FEATURE: allowedValues parameter constrains LLM output to exact strings.
-//  Use this to guarantee clean output without any JSON parsing in Solidity.
 // ═══════════════════════════════════════════════════════════════════════
 
 interface ILLMInferenceAgent {
     /// @notice Run deterministic LLM inference with constrained output
-    /// @param prompt         User prompt — the question / task
-    /// @param system         System prompt — role and rules for the model
+    /// @param prompt         User prompt
+    /// @param system         System prompt
     /// @param chainOfThought Whether to use chain-of-thought reasoning internally
     /// @param allowedValues  If non-empty, output is FORCED to be one of these strings
-    /// @return               The model's response (constrained if allowedValues set)
+    /// @return               The model's response
     function inferString(
         string memory   prompt,
         string memory   system,
