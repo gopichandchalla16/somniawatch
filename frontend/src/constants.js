@@ -1,10 +1,22 @@
-export const SOMNIAWATCH_ADDRESS  = import.meta.env.VITE_SOMNIAWATCH_ADDRESS || "0xd1e7EAC1aD0ad24eb444CbC9e9A143c570373ED0";
-export const MOCK_VAULT_ADDRESS   = import.meta.env.VITE_MOCK_VAULT_ADDRESS  || "0xeB282f43b4015b7a71cfbd2Bd52f69146030701E";
+export const SOMNIAWATCH_ADDRESS  = "0xd1e7EAC1aD0ad24eb444CbC9e9A143c570373ED0";
+export const MOCK_VAULT_ADDRESS   = "0xeB282f43b4015b7a71cfbd2Bd52f69146030701E";
 export const CERTIFICATE_ADDRESS  = import.meta.env.VITE_CERTIFICATE_ADDRESS || "";
 
 export const SOMNIA_CHAIN_ID      = 50312;
 export const SOMNIA_CHAIN_ID_HEX  = "0xC468";
 export const SOMNIA_RPC           = "https://dream-rpc.somnia.network";
+
+// Clear stale localStorage from old deployments
+const CURRENT_DEPLOYMENT = "0xd1e7EAC1aD0ad24eb444CbC9e9A143c570373ED0";
+if (typeof window !== 'undefined') {
+  const storedDeployment = localStorage.getItem('sw_deployment');
+  if (storedDeployment !== CURRENT_DEPLOYMENT) {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sw_'))
+      .forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('sw_deployment', CURRENT_DEPLOYMENT);
+  }
+}
 
 export const SOMNIA_NETWORK_CONFIG = {
   chainId:           "0xC468",
