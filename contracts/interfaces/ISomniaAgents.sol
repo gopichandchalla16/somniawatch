@@ -1,118 +1,106 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// ═══════════════════════════════════════════════════════════════════════
-//  SOMNIA PLATFORM TYPES
-//  Source: agents.somnia.network (verified May 2026)
-//  Platform: 0x5E5205CF39E766118C01636bED000A54D93163E6
-// ═══════════════════════════════════════════════════════════════════════
+// ======================================================================
+//  ISomniaAgents.sol
+//  Interfaces for Somnia Agentic L1 platform
+//  Platform address: 0x5E5205CF39E766118C01636bED000A54D93163E6
+//  Chain ID: 50312
+// ======================================================================
 
-/// @notice Consensus mode used by the validator subcommittee
-enum ConsensusType {
-    Majority,   // 0 - Simple majority of validators must agree
-    Threshold   // 1 - Threshold-based agreement
-}
+/// @notice Response status returned by the platform after agent consensus
+enum ResponseStatus { Success, Failure, Timeout }
 
-/// @notice Lifecycle status of an agent request
-enum ResponseStatus {
-    None,       // 0 - Default zero value (uninitialized storage)
-    Pending,    // 1 - Awaiting validator responses
-    Success,    // 2 - Consensus reached normally
-    Failed,     // 3 - Validators reported failure
-    TimedOut    // 4 - Request timed out before consensus
-}
-
-/// @notice A single validator's response to an agent request
+/// @notice A single validator response
 struct Response {
-    address        validator;     // Validator node address
-    bytes          result;        // ABI-encoded result bytes
-    ResponseStatus status;        // This validator's status
-    uint256        receipt;       // Validator's execution receipt
-    uint256        timestamp;     // When this response was submitted
-    uint256        executionCost; // Gas cost of execution
+    bytes  result;    // ABI-encoded return value
+    uint8  status;    // 0=success, 1=failure
 }
 
-/// @notice Full request details stored by the platform
+/// @notice The original request parameters
 struct Request {
-    uint256        id;
-    address        requester;        // Contract that created this request
-    address        callbackAddress;  // Where to call back with result
-    bytes4         callbackSelector; // Which function to call
-    address[]      subcommittee;     // Selected validator nodes
-    Response[]     responses;        // All collected responses
-    uint256        responseCount;
-    uint256        failureCount;
-    uint256        threshold;
-    uint256        createdAt;
-    uint256        deadline;
-    ResponseStatus status;
-    ConsensusType  consensusType;
-    uint256        remainingBudget;
-    uint256        perAgentBudget;
+    uint256 agentId;
+    address callbackContract;
+    bytes4  callbackSelector;
+    bytes   payload;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  PLATFORM INTERFACE
-//  Address: 0x5E5205CF39E766118C01636bED000A54D93163E6
-// ═══════════════════════════════════════════════════════════════════════
+// ======================================================================
+//  IAgentRequester — core platform interface
+// ======================================================================
 
 interface IAgentRequester {
-    /// @notice Create a request to a Somnia Agent
-    /// @param agentId          uint256 agent ID from agents.somnia.network
-    /// @param callbackAddress  Contract address to receive the result
-    /// @param callbackSelector 4-byte selector of the callback function
-    /// @param payload          ABI-encoded agent method call
-    /// @return requestId       Unique ID — store this as your on-chain receipt
+    /// @notice Submit an agent request to the Somnia validator network
+    /// @param  agentId           Agent ID from agents.somnia.network
+    /// @param  callbackContract  Contract to receive consensus callback
+    /// @param  callbackSelector  Function selector for the callback
+    /// @param  payload           ABI-encoded agent call (fetchString/parseWebsite/inferString)
+    /// @return requestId         Unique ID — becomes receiptId after consensus
     function createRequest(
-        uint256        agentId,
-        address        callbackAddress,
-        bytes4         callbackSelector,
-        bytes calldata payload
+        uint256 agentId,
+        address callbackContract,
+        bytes4  callbackSelector,
+        bytes   calldata payload
     ) external payable returns (uint256 requestId);
 
-    /// @notice Returns the minimum platform reserve (operations floor)
-    /// @dev Add (COST_PER_AGENT * SUBCOMMITTEE_SIZE) on top for execution reward
+    /// @notice Minimum ETH deposit required per request
     function getRequestDeposit() external view returns (uint256);
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  JSON API REQUEST AGENT
-//  ID:   13174292974160097713
-//  Cost: 0.03 SOMI per agent × 3 validators = 0.09 SOMI + reserve = 0.12 SOMI
-// ═══════════════════════════════════════════════════════════════════════
+// ======================================================================
+//  IJsonApiAgent — fetchString (Agent ID: 13174292974160097713)
+//  Cost: 0.12 STT total (0.04 STT × 3 validators)
+// ======================================================================
 
 interface IJsonApiAgent {
-    /// @notice Fetch a string value from a public JSON API
-    /// @param url      Full URL to fetch
-    /// @param selector JSONPath-style selector for the value to extract
-    /// @return         Extracted string value
+    /// @notice Fetch a JSON field from a REST API endpoint
+    /// @param  url    Full URL to fetch (must return valid JSON)
+    /// @param  field  Top-level JSON field to extract (e.g. "items", "result")
+    /// @return        ABI-encoded string of the extracted field value
     function fetchString(
         string memory url,
-        string memory selector
+        string memory field
     ) external returns (string memory);
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  LLM INFERENCE AGENT
-//  ID:    12847293847561029384
+// ======================================================================
+//  ILLMParseAgent — parseWebsite (LLM Parse Agent)
+//  Agent ID: SET THIS FROM agents.somnia.network — search "LLM Parse Agent"
+//            or "Website Parse Agent". Update PARSE_AGENT_ID in SomniaWatch.sol.
+//  Cost: 0.36 STT total (0.12 STT × 3 validators)
+// ======================================================================
+
+interface ILLMParseAgent {
+    /// @notice Scrape a webpage and extract structured data via LLM
+    /// @param  url               Full URL to scrape
+    /// @param  extractionPrompt  Instructions for what to extract
+    ///                           e.g. "string - extract: total tx count, top 3 method signatures"
+    /// @return                   ABI-encoded string with extracted data
+    function parseWebsite(
+        string memory url,
+        string memory extractionPrompt
+    ) external returns (string memory);
+}
+
+// ======================================================================
+//  ILLMInferenceAgent — inferString (Agent ID: 12847293847561029384)
+//  Cost: 0.24 STT total (0.08 STT × 3 validators)
 //  Model: Qwen3-30B
-//  Cost:  0.07 SOMI per agent × 3 validators = 0.21 SOMI + reserve = 0.24 SOMI
-//
-//  KEY FEATURE: allowedValues parameter constrains LLM output to exact strings.
-//  Use this to guarantee clean output without any JSON parsing in Solidity.
-// ═══════════════════════════════════════════════════════════════════════
+// ======================================================================
 
 interface ILLMInferenceAgent {
-    /// @notice Run deterministic LLM inference with constrained output
-    /// @param prompt         User prompt — the question / task
-    /// @param system         System prompt — role and rules for the model
-    /// @param chainOfThought Whether to use chain-of-thought reasoning internally
-    /// @param allowedValues  If non-empty, output is FORCED to be one of these strings
-    /// @return               The model's response (constrained if allowedValues set)
+    /// @notice Run LLM inference with optional constrained output
+    /// @param  userPrompt    The main prompt / question
+    /// @param  systemPrompt  System context for the LLM
+    /// @param  stream        Set false for on-chain use
+    /// @param  allowedValues Constrained output set (empty = free text)
+    ///                       When set, model MUST return one of these values
+    ///                       Eliminates JSON parsing and hallucination risk
+    /// @return               ABI-encoded string response
     function inferString(
-        string memory   prompt,
-        string memory   system,
-        bool            chainOfThought,
+        string memory   userPrompt,
+        string memory   systemPrompt,
+        bool            stream,
         string[] memory allowedValues
     ) external returns (string memory);
 }

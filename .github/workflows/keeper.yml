@@ -1,29 +1,45 @@
-name: SomniaWatch Keeper - 5min Autonomous Alerts
+name: SomniaWatch Keeper
 
 on:
   schedule:
-    - cron: '*/5 * * * *'   # Every 5 minutes, 24/7, free on GitHub Actions
-  workflow_dispatch:         # Also allows manual trigger from GitHub UI
+    # Every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Manual trigger reason'
+        required: false
+        default: 'Manual run'
 
 jobs:
   keeper:
+    name: Run Autonomous Keeper
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 15
+
     steps:
-      - name: Trigger SomniaWatch Keeper Cron
-        run: |
-          echo "Triggering SomniaWatch keeper at $(date)"
-          RESPONSE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
-            -X GET \
-            -H "Accept: application/json" \
-            "${{ secrets.KEEPER_CRON_URL }}")
-          echo "HTTP Status: $RESPONSE"
-          cat /tmp/response.json
-          if [ "$RESPONSE" != "200" ]; then
-            echo "Keeper cron returned non-200: $RESPONSE"
-            exit 1
-          fi
-          DISCORD=$(cat /tmp/response.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('alerts',{}).get('discord','?'))")
-          TELEGRAM=$(cat /tmp/response.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('alerts',{}).get('telegram','?'))")
-          echo "Discord: $DISCORD"
-          echo "Telegram: $TELEGRAM"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run keeper (real on-chain agent calls)
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          SOMNIA_RPC: ${{ secrets.SOMNIA_RPC }}
+          SOMNIAWATCH_ADDRESS: ${{ secrets.SOMNIAWATCH_ADDRESS }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node scripts/keeper-standalone.js
+
+      - name: Report status
+        if: always()
+        run: echo "Keeper run completed at $(date -u)"

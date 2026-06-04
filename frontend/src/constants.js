@@ -1,10 +1,19 @@
-export const SOMNIAWATCH_ADDRESS  = import.meta.env.VITE_SOMNIAWATCH_ADDRESS || "0x21845ed6C3A3268AFAC41f42244436C7662fd03d";
-export const MOCK_VAULT_ADDRESS   = import.meta.env.VITE_MOCK_VAULT_ADDRESS  || "0xEC263eBBA7f26ab58C78c27c93fD84D369e5d39B";
+export const SOMNIAWATCH_ADDRESS  = "0xd1e7EAC1aD0ad24eb444CbC9e9A143c570373ED0";
+export const MOCK_VAULT_ADDRESS   = "0xeB282f43b4015b7a71cfbd2Bd52f69146030701E";
 export const CERTIFICATE_ADDRESS  = import.meta.env.VITE_CERTIFICATE_ADDRESS || "";
 
 export const SOMNIA_CHAIN_ID      = 50312;
 export const SOMNIA_CHAIN_ID_HEX  = "0xC468";
 export const SOMNIA_RPC           = "https://dream-rpc.somnia.network";
+
+// Auto-clear stale localStorage from previous deployments
+if (typeof window !== 'undefined') {
+  const DEPLOY_KEY = "sw_deployment_v3";
+  if (!localStorage.getItem(DEPLOY_KEY)) {
+    Object.keys(localStorage).filter(k => k.startsWith('sw_')).forEach(k => localStorage.removeItem(k));
+    localStorage.setItem(DEPLOY_KEY, "0xd1e7EAC1aD0ad24eb444CbC9e9A143c570373ED0");
+  }
+}
 
 export const SOMNIA_NETWORK_CONFIG = {
   chainId:           "0xC468",
