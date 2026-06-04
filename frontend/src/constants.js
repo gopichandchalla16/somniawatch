@@ -6,15 +6,12 @@ export const SOMNIA_CHAIN_ID      = 50312;
 export const SOMNIA_CHAIN_ID_HEX  = "0xC468";
 export const SOMNIA_RPC           = "https://dream-rpc.somnia.network";
 
-// Clear stale localStorage from old deployments
-const CURRENT_DEPLOYMENT = "0xd1e7EAC1aD0ad24eb444CbC9e9A143c570373ED0";
+// Auto-clear stale localStorage from previous deployments
 if (typeof window !== 'undefined') {
-  const storedDeployment = localStorage.getItem('sw_deployment');
-  if (storedDeployment !== CURRENT_DEPLOYMENT) {
-    Object.keys(localStorage)
-      .filter(k => k.startsWith('sw_'))
-      .forEach(k => localStorage.removeItem(k));
-    localStorage.setItem('sw_deployment', CURRENT_DEPLOYMENT);
+  const DEPLOY_KEY = "sw_deployment_v3";
+  if (!localStorage.getItem(DEPLOY_KEY)) {
+    Object.keys(localStorage).filter(k => k.startsWith('sw_')).forEach(k => localStorage.removeItem(k));
+    localStorage.setItem(DEPLOY_KEY, "0xd1e7EAC1aD0ad24eb444CbC9e9A143c570373ED0");
   }
 }
 
