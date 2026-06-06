@@ -168,14 +168,8 @@ contract SomniaWatch {
 
     // ================================================================
     //  STEP 1 - TRIGGER MONITORING
-    //  Sends request to JSON API Agent to fetch recent transactions
     // ================================================================
 
-    /// @notice Trigger a monitoring cycle for a registered contract
-    /// @dev Contract must hold enough SOMI or caller must send msg.value.
-    ///      Called automatically by keeper.js every 5 minutes.
-    /// @param target The registered contract address to monitor
-    /// @return requestId The Somnia platform requestId for this agent call
     function triggerMonitor(address target)
         external payable returns (uint256 requestId)
     {
@@ -186,7 +180,6 @@ contract SomniaWatch {
             "Too soon: minimum 5 minutes between monitoring checks"
         );
 
-        // Calculate exact deposit: platform reserve + execution reward for 3 validators
         uint256 reserve = platform.getRequestDeposit();
         uint256 deposit = reserve + (JSON_COST_PER_AGENT * SUBCOMMITTEE_SIZE);
 
@@ -195,21 +188,18 @@ contract SomniaWatch {
             "Insufficient SOMI: fund the contract first with fund()"
         );
 
-        // Build the Somnia explorer API URL for this contract's transactions
         string memory apiUrl = string(abi.encodePacked(
             explorerApiBase,
             _toHex(target),
             "/transactions?limit=20"
         ));
 
-        // Encode the fetchString agent method call
         bytes memory payload = abi.encodeWithSelector(
             IJsonApiAgent.fetchString.selector,
             apiUrl,
             "items"
         );
 
-        // Send request to Somnia platform - callback: handleTxDataResponse
         requestId = platform.createRequest{value: deposit}(
             JSON_AGENT_ID,
             address(this),
@@ -217,18 +207,15 @@ contract SomniaWatch {
             payload
         );
 
-        // Track this pending request
         pendingChecks[requestId] = PendingCheck({
             target:     target,
             stage:      CheckStage.AWAITING_TX_DATA,
             txSnapshot: ""
         });
 
-        // Update monitoring profile
         profile.lastChecked = block.timestamp;
         profile.totalChecks++;
 
-        // Refund any excess msg.value to the caller
         if (msg.value > deposit) {
             payable(msg.sender).transfer(msg.value - deposit);
         }
@@ -238,13 +225,8 @@ contract SomniaWatch {
 
     // ================================================================
     //  STEP 2 - JSON API CALLBACK
-    //  Called by platform when 3 validators reach consensus on tx data
-    //  Immediately chains to LLM Inference Agent
     // ================================================================
 
-    /// @notice Callback from Somnia JSON API Agent
-    /// @dev ONLY callable by the platform contract.
-    ///      On success: decodes tx data and triggers LLM classification.
     function handleTxDataResponse(
         uint256        requestId,
         Response[]     memory responses,
@@ -259,9 +241,10 @@ contract SomniaWatch {
 
         address target = pc.target;
 
-        // Handle agent failure or timeout gracefully
-        if (status != ResponseStatus.Success || responses.length == 0) {
-            string memory reason = (status == ResponseStatus.Failed)
+        // FIX: Use integer comparison instead of ResponseStatus.Failed enum member
+        // ResponseStatus: 0=Pending, 1=Success, 2=Failed, 3=Timeout
+        if (uint8(status) != 1 || responses.length == 0) {
+            string memory reason = (uint8(status) == 2)
                 ? "json_agent_failed"
                 : "json_agent_timeout";
             emit AgentCallFailed(target, requestId, reason);
@@ -269,13 +252,7 @@ contract SomniaWatch {
             return;
         }
 
-        // Decode the transaction data string from consensus result
         string memory txData = abi.decode(responses[0].result, (string));
-
-        // Build LLM Prompt
-        // Using Qwen3-30B via Somnia's LLM Inference Agent.
-        // allowedValues FORCES output to be exactly one of our 3 strings.
-        // This eliminates ALL JSON parsing in Solidity - direct keccak256 compare.
 
         string memory userPrompt = string(abi.encodePacked(
             "You are analyzing recent blockchain transaction data from a monitored "
@@ -297,22 +274,19 @@ contract SomniaWatch {
             "Be precise: safe means no anomalies detected, suspicious means unusual but "
             "not confirmed attack, critical means clear evidence of an attack pattern.";
 
-        // allowedValues array - constrains LLM to return ONLY one of these strings
         string[] memory allowedValues = new string[](3);
         allowedValues[0] = "safe";
         allowedValues[1] = "suspicious";
         allowedValues[2] = "critical";
 
-        // Encode the inferString agent method call
         bytes memory llmPayload = abi.encodeWithSelector(
             ILLMInferenceAgent.inferString.selector,
             userPrompt,
             systemPrompt,
-            false,         // chainOfThought: false for faster deterministic response
-            allowedValues  // OUTPUT FORCED to "safe", "suspicious", or "critical"
+            false,
+            allowedValues
         );
 
-        // Calculate LLM deposit
         uint256 reserve    = platform.getRequestDeposit();
         uint256 llmDeposit = reserve + (LLM_COST_PER_AGENT * SUBCOMMITTEE_SIZE);
 
@@ -321,7 +295,6 @@ contract SomniaWatch {
             "Insufficient SOMI for LLM step: call fund() to top up contract balance"
         );
 
-        // Send LLM request - callback: handleClassificationResponse
         uint256 llmReqId = platform.createRequest{value: llmDeposit}(
             LLM_AGENT_ID,
             address(this),
@@ -329,14 +302,12 @@ contract SomniaWatch {
             llmPayload
         );
 
-        // Transfer pending check tracking to the new LLM requestId
         pendingChecks[llmReqId] = PendingCheck({
             target:     target,
             stage:      CheckStage.AWAITING_CLASSIFICATION,
             txSnapshot: txData
         });
 
-        // Clean up old JSON request tracking
         delete pendingChecks[requestId];
 
         emit TxDataReceived(target, requestId, llmReqId);
@@ -344,15 +315,8 @@ contract SomniaWatch {
 
     // ================================================================
     //  STEP 3 - LLM CALLBACK
-    //  Called by platform when 3 validators reach consensus on classification
-    //  This is the autonomous decision point - no human involved
     // ================================================================
 
-    /// @notice Callback from Somnia LLM Inference Agent (Qwen3-30B)
-    /// @dev ONLY callable by the platform contract.
-    ///      The riskStr result is GUARANTEED to be "safe", "suspicious", or "critical"
-    ///      because allowedValues was set in the agent request.
-    ///      No JSON parsing needed - direct keccak256 string comparison only.
     function handleClassificationResponse(
         uint256        requestId,
         Response[]     memory responses,
@@ -367,8 +331,8 @@ contract SomniaWatch {
         address target     = pc.target;
         string  memory txSS = pc.txSnapshot;
 
-        // Handle agent failure - store safe record, don't block future checks
-        if (status != ResponseStatus.Success || responses.length == 0) {
+        // FIX: Use integer comparison instead of ResponseStatus.Failed enum member
+        if (uint8(status) != 1 || responses.length == 0) {
             _storeAudit(target, RiskLevel.SAFE, "unknown",
                         "Agent unavailable - check retried next cycle",
                         requestId, false);
@@ -378,21 +342,11 @@ contract SomniaWatch {
             return;
         }
 
-        // Decode LLM result - GUARANTEED to be "safe", "suspicious", or "critical"
-        // because allowedValues was set. No JSON parsing needed anywhere.
         string memory riskStr = abi.decode(responses[0].result, (string));
+        RiskLevel riskLevel   = _toRiskLevel(riskStr);
+        string memory riskType    = _deriveRiskType(riskLevel, txSS);
+        string memory reasoning   = _deriveReasoning(riskLevel, riskType);
 
-        // Map guaranteed string to enum
-        RiskLevel riskLevel = _toRiskLevel(riskStr);
-
-        // Derive risk type and reasoning from level + tx data patterns
-        string memory riskType  = _deriveRiskType(riskLevel, txSS);
-        string memory reasoning = _deriveReasoning(riskLevel, riskType);
-
-        // Autonomous Action
-        // If CRITICAL: automatically flag the contract.
-        // This decision was made by Qwen3-30B, consensus-validated by 3 validators.
-        // No human decided this - the agent network did.
         bool autoActioned = false;
 
         if (riskLevel == RiskLevel.CRITICAL && !registry[target].isFlagged) {
@@ -401,27 +355,17 @@ contract SomniaWatch {
             registry[target].lastRiskType = riskType;
             autoActioned = true;
             emit ContractFlagged(target, riskType, requestId);
-
         } else if (riskLevel == RiskLevel.SUSPICIOUS) {
             registry[target].riskScore    = 60;
             registry[target].lastRiskType = riskType;
-
         } else {
-            // SAFE
             registry[target].riskScore    = 10;
             registry[target].lastRiskType = riskType;
         }
 
-        // Store the immutable audit record
-        // receiptId = Somnia agent requestId = verifiable on-chain proof of AI decision
-        // Anyone can look up this requestId on the Somnia explorer to see what
-        // the agent was asked and what consensus was reached.
         _storeAudit(target, riskLevel, riskType, reasoning, requestId, autoActioned);
-
         totalAuditsCompleted++;
-
         emit RiskClassified(target, uint8(riskLevel), riskType, requestId);
-
         delete pendingChecks[requestId];
     }
 
@@ -429,15 +373,11 @@ contract SomniaWatch {
     //  FUNDING & ADMIN
     // ================================================================
 
-    /// @notice Fund the contract with SOMI to pay for agent calls
-    /// @dev Send at least 5 SOMI to cover ~14 full monitoring cycles (0.36 each)
     function fund() external payable {
         require(msg.value > 0, "Must send SOMI");
         emit Funded(msg.sender, msg.value);
     }
 
-    /// @notice Clear a flagged contract after human review
-    /// @param target The previously flagged contract address
     function clearFlag(address target) external {
         require(
             msg.sender == registry[target].owner || msg.sender == watchAdmin,
@@ -449,8 +389,6 @@ contract SomniaWatch {
         emit ContractCleared(target);
     }
 
-    /// @notice Update the explorer API base URL
-    /// @param newBase New base URL for the Somnia explorer API
     function updateExplorer(string calldata newBase) external {
         require(msg.sender == watchAdmin, "Admin only");
         explorerApiBase = newBase;
@@ -460,12 +398,10 @@ contract SomniaWatch {
     //  VIEW FUNCTIONS
     // ================================================================
 
-    /// @notice Get full audit history for a monitored contract
     function getAuditHistory(address target)
         external view returns (AuditRecord[] memory)
     { return auditHistory[target]; }
 
-    /// @notice Get the most recent audit record for a contract
     function getLatestAudit(address target)
         external view returns (AuditRecord memory)
     {
@@ -473,32 +409,26 @@ contract SomniaWatch {
         return auditHistory[target][auditHistory[target].length - 1];
     }
 
-    /// @notice Get all registered contract addresses
     function getAllRegistered()
         external view returns (address[] memory)
     { return registeredContracts; }
 
-    /// @notice Count of registered contracts
     function getRegisteredCount()
         external view returns (uint256)
     { return registeredContracts.length; }
 
-    /// @notice SOMI deposit required for a JSON API agent call
     function depositForJson() public view returns (uint256) {
         return platform.getRequestDeposit() + (JSON_COST_PER_AGENT * SUBCOMMITTEE_SIZE);
     }
 
-    /// @notice SOMI deposit required for an LLM Inference agent call
     function depositForLlm() public view returns (uint256) {
         return platform.getRequestDeposit() + (LLM_COST_PER_AGENT * SUBCOMMITTEE_SIZE);
     }
 
-    /// @notice Total SOMI required for one complete monitoring cycle (JSON + LLM)
     function depositForFullCycle() external view returns (uint256) {
         return depositForJson() + depositForLlm();
     }
 
-    /// @notice Current SOMI balance held by this contract
     function contractBalance() external view returns (uint256) {
         return address(this).balance;
     }
@@ -507,7 +437,6 @@ contract SomniaWatch {
     //  INTERNAL HELPERS
     // ================================================================
 
-    /// @dev Store an audit record in the contract's history
     function _storeAudit(
         address   target,
         RiskLevel riskLevel,
@@ -527,8 +456,6 @@ contract SomniaWatch {
         }));
     }
 
-    /// @dev Map LLM result string to RiskLevel enum
-    ///      allowedValues guarantees input is "safe", "suspicious", or "critical"
     function _toRiskLevel(string memory r) internal pure returns (RiskLevel) {
         bytes32 h = keccak256(bytes(r));
         if (h == keccak256(bytes("critical")))   return RiskLevel.CRITICAL;
@@ -536,31 +463,20 @@ contract SomniaWatch {
         return RiskLevel.SAFE;
     }
 
-    /// @dev Derive a specific risk type string from the level and tx snapshot
     function _deriveRiskType(RiskLevel level, string memory txData)
         internal pure returns (string memory)
     {
         if (level == RiskLevel.SAFE) return "normal";
-
         bytes memory d = bytes(txData);
-
-        // Reentrancy pattern: withdraw calls present with critical risk
         if (level == RiskLevel.CRITICAL && _contains(d, bytes("withdraw")))
             return "reentrancy_pattern";
-
-        // Access control: drain or emergency patterns
         if (_contains(d, bytes("drain")) || _contains(d, bytes("emergency")))
             return "access_violation";
-
-        // Value anomaly: large value transfers
         if (level == RiskLevel.CRITICAL && _contains(d, bytes("value")))
             return "value_anomaly";
-
-        // Defaults
         return (level == RiskLevel.CRITICAL) ? "reentrancy_pattern" : "access_violation";
     }
 
-    /// @dev Build a human-readable reasoning string for the audit record
     function _deriveReasoning(RiskLevel level, string memory riskType)
         internal pure returns (string memory)
     {
@@ -575,7 +491,6 @@ contract SomniaWatch {
         return "Anomalous transaction pattern detected by Qwen3-30B classifier on Somnia.";
     }
 
-    /// @dev Substring search: does `data` contain `sub`?
     function _contains(bytes memory data, bytes memory sub)
         internal pure returns (bool)
     {
@@ -590,12 +505,10 @@ contract SomniaWatch {
         return false;
     }
 
-    /// @dev String equality comparison using keccak256
     function _eq(string memory a, string memory b)
         internal pure returns (bool)
     { return keccak256(bytes(a)) == keccak256(bytes(b)); }
 
-    /// @dev Convert an address to a lowercase "0x..." hex string for API URLs
     function _toHex(address a) internal pure returns (string memory) {
         bytes memory hexChars = "0123456789abcdef";
         bytes20 b = bytes20(a);
@@ -609,6 +522,5 @@ contract SomniaWatch {
         return string(result);
     }
 
-    /// @notice Accept SOMI rebates from the Somnia platform
     receive() external payable {}
 }
