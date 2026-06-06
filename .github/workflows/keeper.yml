@@ -2,7 +2,7 @@ name: SomniaWatch Keeper
 
 on:
   schedule:
-    # Every 6 hours
+    # Every 6 hours: 00:00, 06:00, 12:00, 18:00 UTC
     - cron: '0 */6 * * *'
   workflow_dispatch:
     inputs:
@@ -10,6 +10,10 @@ on:
         description: 'Manual trigger reason'
         required: false
         default: 'Manual run'
+
+concurrency:
+  group: somniawatch-keeper
+  cancel-in-progress: false
 
 jobs:
   keeper:
@@ -25,12 +29,69 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # NOTE: cache intentionally omitted — no package-lock.json in root
+          # Add cache: 'npm' only after committing a package-lock.json
 
-      - name: Install dependencies
-        run: npm install
+      - name: Validate required secrets
+        shell: bash
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          SOMNIA_RPC: ${{ secrets.SOMNIA_RPC }}
+          SOMNIAWATCH_ADDRESS: ${{ secrets.SOMNIAWATCH_ADDRESS }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          echo "=== SomniaWatch Keeper Secret Check ==="
+          FAIL=0
 
-      - name: Run keeper (real on-chain agent calls)
+          if [ -z "$PRIVATE_KEY" ]; then
+            echo "::error::PRIVATE_KEY secret is missing — keeper cannot sign transactions"
+            FAIL=1
+          else
+            echo "✅ PRIVATE_KEY set"
+          fi
+
+          if [ -z "$SOMNIAWATCH_ADDRESS" ]; then
+            echo "::error::SOMNIAWATCH_ADDRESS secret is missing — keeper has no contract to call"
+            FAIL=1
+          else
+            echo "✅ SOMNIAWATCH_ADDRESS set"
+          fi
+
+          if [ -z "$SOMNIA_RPC" ]; then
+            echo "::warning::SOMNIA_RPC not set — will fall back to https://dream-rpc.somnia.network"
+          else
+            echo "✅ SOMNIA_RPC set"
+          fi
+
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "::warning::DISCORD_WEBHOOK not set — Discord alerts will be skipped (non-fatal)"
+          else
+            echo "✅ DISCORD_WEBHOOK set"
+          fi
+
+          if [ -z "$TELEGRAM_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "::warning::TELEGRAM_TOKEN or TELEGRAM_CHAT_ID not set — Telegram alerts will be skipped (non-fatal)"
+          else
+            echo "✅ TELEGRAM set"
+          fi
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo ""
+            echo "❌ Missing required secrets. Go to:"
+            echo "   Repo → Settings → Secrets and variables → Actions"
+            echo "   Add: PRIVATE_KEY and SOMNIAWATCH_ADDRESS"
+            exit 1
+          fi
+
+          echo "=== Secret check passed ==="
+
+      - name: Install root dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run Autonomous Keeper
+        id: keeper
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           SOMNIA_RPC: ${{ secrets.SOMNIA_RPC }}
@@ -40,6 +101,11 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: node scripts/keeper-standalone.js
 
-      - name: Report status
+      - name: Report keeper result
         if: always()
-        run: echo "Keeper run completed at $(date -u)"
+        run: |
+          echo "======================================="
+          echo " SomniaWatch Keeper — Run Complete"
+          echo " Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo " Status: ${{ steps.keeper.outcome }}"
+          echo "======================================="
