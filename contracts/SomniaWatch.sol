@@ -12,8 +12,12 @@ contract SomniaWatch {
 
     uint256 public constant JSON_AGENT_ID       = 13174292974160097713;
     uint256 public constant LLM_AGENT_ID        = 12847293847561029384;
-    uint256 public constant JSON_COST_PER_AGENT = 30000000000000000;
-    uint256 public constant LLM_COST_PER_AGENT  = 70000000000000000;
+
+    // Hardcoded deposits — avoids calling platform.getRequestDeposit() which reverts on testnet
+    // JSON agent: 0.04 STT x 3 validators = 0.12 STT. Send 0.13 to cover platform reserve.
+    // LLM  agent: 0.08 STT x 3 validators = 0.24 STT. Send 0.25 to cover platform reserve.
+    uint256 public constant JSON_DEPOSIT        = 0.13 ether;
+    uint256 public constant LLM_DEPOSIT         = 0.25 ether;
     uint256 public constant SUBCOMMITTEE_SIZE   = 3;
     uint256 public constant MIN_INTERVAL        = 5 minutes;
 
@@ -65,7 +69,7 @@ contract SomniaWatch {
     event AgentCallFailed   (address indexed target, uint256 requestId, string reason);
     event Funded            (address indexed by, uint256 amount);
 
-    constructor(address _platform, uint256 _parseAgentId) {
+    constructor(address _platform) {
         require(_platform != address(0), "Invalid platform");
         platform   = IAgentRequester(_platform);
         watchAdmin = msg.sender;
@@ -84,10 +88,8 @@ contract SomniaWatch {
         ContractProfile storage profile = registry[target];
         require(profile.isRegistered, "Not registered");
         require(block.timestamp >= profile.lastChecked + MIN_INTERVAL, "Too soon");
-
-        uint256 reserve = platform.getRequestDeposit();
-        uint256 deposit = reserve + (JSON_COST_PER_AGENT * SUBCOMMITTEE_SIZE);
-        require(address(this).balance + msg.value >= deposit, "Insufficient SOMI: fund() first");
+        // Use hardcoded JSON_DEPOSIT — no platform call needed
+        require(address(this).balance + msg.value >= JSON_DEPOSIT, "Insufficient SOMI: fund() first");
 
         string memory apiUrl = string(abi.encodePacked(
             explorerApiBase, _toHex(target), "/transactions?limit=20"
@@ -96,22 +98,22 @@ contract SomniaWatch {
             IJsonApiAgent.fetchString.selector, apiUrl, "items"
         );
 
-        requestId = platform.createRequest{value: deposit}(
+        requestId = platform.createRequest{value: JSON_DEPOSIT}(
             JSON_AGENT_ID, address(this), this.handleTxDataResponse.selector, payload
         );
 
         pendingChecks[requestId] = PendingCheck(target, CheckStage.AWAITING_TX_DATA, "");
         profile.lastChecked = block.timestamp;
         profile.totalChecks++;
-        if (msg.value > deposit) payable(msg.sender).transfer(msg.value - deposit);
-        emit MonitorTriggered(target, requestId, deposit);
+        if (msg.value > JSON_DEPOSIT) payable(msg.sender).transfer(msg.value - JSON_DEPOSIT);
+        emit MonitorTriggered(target, requestId, JSON_DEPOSIT);
     }
 
     function handleTxDataResponse(
-        uint256      requestId,
-        Response[]   memory responses,
+        uint256        requestId,
+        Response[]     memory responses,
         ResponseStatus status,
-        Request      memory
+        Request        memory
     ) external {
         require(msg.sender == address(platform), "Platform only");
         PendingCheck storage pc = pendingChecks[requestId];
@@ -119,10 +121,8 @@ contract SomniaWatch {
         require(pc.stage == CheckStage.AWAITING_TX_DATA, "Wrong stage");
         address target = pc.target;
 
-        // FIX: use uint8 cast — ResponseStatus has no .Failed member in this interface
-        // 0=Pending 1=Success 2=Failed 3=Timeout
-        if (uint8(status) != 1 || responses.length == 0) {
-            string memory reason = uint8(status) == 2 ? "json_agent_failed" : "json_agent_timeout";
+        if (uint8(status) != 0 || responses.length == 0) {
+            string memory reason = uint8(status) == 1 ? "json_agent_failed" : "json_agent_timeout";
             emit AgentCallFailed(target, requestId, reason);
             delete pendingChecks[requestId];
             return;
@@ -152,11 +152,9 @@ contract SomniaWatch {
             userPrompt, systemPrompt, false, allowedValues
         );
 
-        uint256 reserve    = platform.getRequestDeposit();
-        uint256 llmDeposit = reserve + (LLM_COST_PER_AGENT * SUBCOMMITTEE_SIZE);
-        require(address(this).balance >= llmDeposit, "Insufficient SOMI for LLM: fund() first");
+        require(address(this).balance >= LLM_DEPOSIT, "Insufficient SOMI for LLM: fund() first");
 
-        uint256 llmReqId = platform.createRequest{value: llmDeposit}(
+        uint256 llmReqId = platform.createRequest{value: LLM_DEPOSIT}(
             LLM_AGENT_ID, address(this), this.handleClassificationResponse.selector, llmPayload
         );
 
@@ -166,10 +164,10 @@ contract SomniaWatch {
     }
 
     function handleClassificationResponse(
-        uint256      requestId,
-        Response[]   memory responses,
+        uint256        requestId,
+        Response[]     memory responses,
         ResponseStatus status,
-        Request      memory
+        Request        memory
     ) external {
         require(msg.sender == address(platform), "Platform only");
         PendingCheck storage pc = pendingChecks[requestId];
@@ -177,8 +175,7 @@ contract SomniaWatch {
         address target = pc.target;
         string memory txSS = pc.txSnapshot;
 
-        // FIX: uint8 cast instead of ResponseStatus.Failed
-        if (uint8(status) != 1 || responses.length == 0) {
+        if (uint8(status) != 0 || responses.length == 0) {
             _storeAudit(target, RiskLevel.SAFE, "unknown", "Agent unavailable - retry next cycle", requestId, false);
             emit AgentCallFailed(target, requestId, "llm_failed_or_timeout");
             delete pendingChecks[requestId];
@@ -247,16 +244,9 @@ contract SomniaWatch {
         return registeredContracts.length;
     }
 
-    function depositForJson() public view returns (uint256) {
-        return platform.getRequestDeposit() + (JSON_COST_PER_AGENT * SUBCOMMITTEE_SIZE);
-    }
-
-    function depositForLlm() public view returns (uint256) {
-        return platform.getRequestDeposit() + (LLM_COST_PER_AGENT * SUBCOMMITTEE_SIZE);
-    }
-
-    function depositForFullCycle() external view returns (uint256) {
-        return depositForJson() + depositForLlm();
+    // Pure view — no platform call, safe to call anytime
+    function depositForFullCycle() external pure returns (uint256) {
+        return JSON_DEPOSIT + LLM_DEPOSIT;
     }
 
     function contractBalance() external view returns (uint256) {
