@@ -8,6 +8,7 @@ import AlertLog from './components/AlertLog';
 import ThreatIntelCard from './components/ThreatIntelCard';
 import AgentExplorer from './components/AgentExplorer';
 import AgentPlayground from './components/AgentPlayground';
+import ForceAudit from './components/ForceAudit';
 import SomniaWatchABI from './abi/SomniaWatch.json';
 import AuditCertABI from './abi/AuditCertificate.json';
 import {
@@ -46,18 +47,18 @@ function getLocalAuditCount() {
 }
 
 export default function App() {
-  const [provider, setProvider]           = useState(null);
-  const [signer, setSigner]               = useState(null);
-  const [account, setAccount]             = useState(null);
-  const [watch, setWatch]                 = useState(null);
-  const [cert, setCert]                   = useState(null);
-  const [contracts, setContracts]         = useState([MOCK_VAULT_ADDRESS]);
-  const [activeTab, setActiveTab]         = useState('dashboard');
-  const [attackStatus, setAttackStatus]   = useState('');
-  const [attackLoading, setAttackLoading] = useState(false);
-  const [registerInput, setRegisterInput] = useState('');
+  const [provider, setProvider]             = useState(null);
+  const [signer, setSigner]                 = useState(null);
+  const [account, setAccount]               = useState(null);
+  const [watch, setWatch]                   = useState(null);
+  const [cert, setCert]                     = useState(null);
+  const [contracts, setContracts]           = useState([MOCK_VAULT_ADDRESS]);
+  const [activeTab, setActiveTab]           = useState('dashboard');
+  const [attackStatus, setAttackStatus]     = useState('');
+  const [attackLoading, setAttackLoading]   = useState(false);
+  const [registerInput, setRegisterInput]   = useState('');
   const [registerStatus, setRegisterStatus] = useState('');
-  const [stats, setStats]                 = useState({ totalAudits: 0, registered: 1 });
+  const [stats, setStats]                   = useState({ totalAudits: 0, registered: 1 });
 
   const loadStats = useCallback(async () => {
     const localCount = getLocalAuditCount();
@@ -88,8 +89,8 @@ export default function App() {
           await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x' + SOMNIA_CHAIN_ID.toString(16), chainName: 'Somnia Testnet', nativeCurrency: { name: 'STT', symbol: 'STT', decimals: 18 }, rpcUrls: [SOMNIA_RPC], blockExplorerUrls: ['https://shannon-explorer.somnia.network'] }] });
         }
       }
-      const p2 = new ethers.BrowserProvider(window.ethereum);
-      const s  = await p2.getSigner();
+      const p2   = new ethers.BrowserProvider(window.ethereum);
+      const s    = await p2.getSigner();
       const addr = await s.getAddress();
       setProvider(p2); setSigner(s); setAccount(addr);
       setWatch(new ethers.Contract(SOMNIAWATCH_ADDRESS, SomniaWatchABI, s));
@@ -105,7 +106,7 @@ export default function App() {
       const tx = await watch.registerContract(registerInput);
       await tx.wait();
       setContracts(prev => [...new Set([...prev, registerInput])]);
-      setRegisterStatus('Registered! Monitoring starts next keeper cycle.');
+      setRegisterStatus('✅ Registered! Monitoring starts next keeper cycle.');
       setRegisterInput('');
       loadStats();
     } catch (e) { setRegisterStatus('Error: ' + (e.reason || e.message)); }
@@ -116,7 +117,7 @@ export default function App() {
     setAttackLoading(true); setAttackStatus('');
     const vault = new ethers.Contract(MOCK_VAULT_ADDRESS, MOCK_VAULT_ABI, signer);
     const addr  = await signer.getAddress();
-    const SHORT = MOCK_VAULT_ADDRESS.slice(0,10)+'...'+MOCK_VAULT_ADDRESS.slice(-6);
+    const SHORT = MOCK_VAULT_ADDRESS.slice(0, 10) + '...' + MOCK_VAULT_ADDRESS.slice(-6);
     try {
       let vaultBal = BigInt(0);
       try { vaultBal = await vault.balances(addr); } catch {}
@@ -130,34 +131,34 @@ export default function App() {
       const tx      = await vault.batchWithdraw(ethers.parseEther('0.001'), 5);
       const receipt = await tx.wait();
       logAlert({ ts: Date.now(), level: 2, contract: SHORT, type: 'batchWithdraw x5 - reentrancy_pattern', discord: true, telegram: true, receipt: receipt.hash });
-      setAttackStatus('CONFIRMED|TX:' + receipt.hash.slice(0,18));
+      setAttackStatus('CONFIRMED|TX:' + receipt.hash.slice(0, 18));
       setTimeout(loadStats, 1000);
     } catch (err) {
-      logAlert({ ts: Date.now(), level: 2, contract: SHORT, type: 'batchWithdraw_pattern_detected (demo)', discord: true, telegram: true, receipt: 'demo_'+Date.now() });
+      logAlert({ ts: Date.now(), level: 2, contract: SHORT, type: 'batchWithdraw_pattern_detected (demo)', discord: true, telegram: true, receipt: 'demo_' + Date.now() });
       setAttackStatus('DEMO|Attack pattern logged — CRITICAL classification pending.');
       setTimeout(loadStats, 1000);
     } finally { setAttackLoading(false); }
   };
 
   const tabs = [
-    { id: 'dashboard',    label: '📡 Dashboard'       },
-    { id: 'alerts',       label: '🔔 Alert Log'        },
-    { id: 'intel',        label: '🔍 Threat Intel'     },
-    { id: 'agents',       label: '🤖 Agent Explorer'   },
-    { id: 'playground',   label: '🧪 Playground'       },
-    { id: 'certificates', label: '🏅 Certificates'     },
-    { id: 'leaderboard',  label: '🏆 Leaderboard'      },
-    { id: 'how-it-works', label: '⚙️ How It Works'     },
+    { id: 'dashboard',    label: '📡 Dashboard'        },
+    { id: 'force-audit',  label: '⚡ Force Audit'       },
+    { id: 'alerts',       label: '🔔 Alert Log'         },
+    { id: 'intel',        label: '🔍 Threat Intel'      },
+    { id: 'agents',       label: '🤖 Agent Explorer'    },
+    { id: 'playground',   label: '🧪 Playground'        },
+    { id: 'certificates', label: '🏅 Certificates'      },
+    { id: 'leaderboard',  label: '🏆 Leaderboard'       },
+    { id: 'how-it-works', label: '⚙️ How It Works'      },
   ];
 
   const isConfirmed = attackStatus.startsWith('CONFIRMED');
-  const isDemo      = attackStatus.startsWith('DEMO');
   const attackMsg   = attackStatus.replace('CONFIRMED|', '').replace('DEMO|', '');
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-base)', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
 
-      {/* Somnia-style top bar */}
+      {/* ── Top bar ── */}
       <header style={{
         borderBottom: '1px solid var(--border)',
         padding: '0 28px',
@@ -170,8 +171,7 @@ export default function App() {
           <div style={{
             width: 32, height: 32, borderRadius: 8,
             background: 'linear-gradient(135deg, var(--purple-dim), var(--cyan))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
           }}>🛡️</div>
           <div>
             <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>SomniaWatch</div>
@@ -185,23 +185,21 @@ export default function App() {
             <span style={{ color: 'var(--border)', userSelect: 'none' }}>|</span>
             <span style={{ color: 'var(--text-dim)' }}>Contracts <strong style={{ color: 'var(--cyan)' }}>{stats.registered}</strong></span>
           </div>
-          {account
-            ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-card)', border: '1px solid var(--border-glow)', padding: '5px 12px', borderRadius: 20 }}>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', animation: 'blink 2s infinite' }} />
-                <span style={{ fontSize: 12, color: 'var(--purple)', fontFamily: 'var(--font-mono)' }}>{account.slice(0,6)}...{account.slice(-4)}</span>
-              </div>
-            )
-            : <button className="btn btn-purple" onClick={connectWallet}>Connect Wallet</button>
-          }
+          {account ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-card)', border: '1px solid var(--border-glow)', padding: '5px 12px', borderRadius: 20 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', animation: 'blink 2s infinite' }} />
+              <span style={{ fontSize: 12, color: 'var(--purple)', fontFamily: 'var(--font-mono)' }}>{account.slice(0, 6)}...{account.slice(-4)}</span>
+            </div>
+          ) : (
+            <button className="btn btn-purple" onClick={connectWallet}>Connect Wallet</button>
+          )}
         </div>
       </header>
 
-      {/* Hero — only when disconnected */}
+      {/* ── Hero (disconnected only) ── */}
       {!account && (
         <div style={{
-          padding: '64px 28px 48px',
-          textAlign: 'center',
+          padding: '64px 28px 48px', textAlign: 'center',
           borderBottom: '1px solid var(--border)',
           background: 'radial-gradient(ellipse 60% 40% at 50% 0%, #7c3aed18 0%, transparent 70%)',
         }}>
@@ -217,11 +215,14 @@ export default function App() {
           <p style={{ color: 'var(--text-sec)', maxWidth: 520, margin: '0 auto 32px', fontSize: 16, lineHeight: 1.7 }}>
             3-agent pipeline · JSON API + LLM Inference + LLM Parse Website · validator consensus · immutable on-chain receipts
           </p>
-          <button className="btn btn-purple" style={{ padding: '12px 32px', fontSize: 15 }} onClick={connectWallet}>Connect Wallet to Start</button>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button className="btn btn-purple" style={{ padding: '12px 32px', fontSize: 15 }} onClick={connectWallet}>Connect Wallet to Start</button>
+            <button className="btn btn-ghost" style={{ padding: '12px 24px', fontSize: 14 }} onClick={() => setActiveTab('force-audit')}>⚡ Try Force Audit (no wallet needed)</button>
+          </div>
         </div>
       )}
 
-      {/* Nav tabs */}
+      {/* ── Nav tabs ── */}
       <div style={{
         display: 'flex', borderBottom: '1px solid var(--border)',
         padding: '0 28px', overflowX: 'auto', background: 'var(--bg-base)',
@@ -234,15 +235,31 @@ export default function App() {
             color: activeTab === t.id ? 'var(--purple)' : 'var(--text-dim)',
             cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 500,
             transition: 'color 0.2s',
+            // highlight the Force Audit tab with a glow so judges notice it
+            ...(t.id === 'force-audit' ? { color: activeTab === 'force-audit' ? '#a5b4fc' : '#6366f1', fontWeight: 700 } : {}),
           }}>{t.label}</button>
         ))}
       </div>
 
-      {/* Content */}
+      {/* ── Page content ── */}
       <div style={{ padding: '28px', maxWidth: 1100, margin: '0 auto' }}>
 
+        {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div>
+            {/* Judge quick-action banner */}
+            <div style={{ background: 'linear-gradient(135deg,#1e1b4b,#0f172a)', border: '1px solid #6366f1', borderRadius: 12, padding: '14px 20px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <span style={{ fontSize: 13, color: '#a5b4fc', fontWeight: 700 }}>👋 Judge? Start here →</span>
+                <span style={{ fontSize: 12, color: '#64748b', marginLeft: 10 }}>No wallet needed for the live audit demo</span>
+              </div>
+              <button
+                className="btn btn-purple"
+                style={{ fontSize: 12, padding: '8px 20px' }}
+                onClick={() => setActiveTab('force-audit')}
+              >⚡ Run Instant Audit</button>
+            </div>
+
             {/* Attack Simulator */}
             <div className="card" style={{ borderColor: '#f43f5e44', background: 'linear-gradient(135deg, #0c0c14, #140a0a)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
@@ -251,7 +268,7 @@ export default function App() {
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>One-Click MockVault Exploit</h3>
                   <p style={{ fontSize: 13, color: 'var(--text-sec)', maxWidth: 500 }}>
                     Calls <code className="mono" style={{ color: 'var(--purple)', fontSize: 12 }}>batchWithdraw(0.001 STT × 5)</code> — auto-deposits if needed.
-                    Agents classify <strong style={{ color: 'var(--red)' }}>CRITICAL</strong> in next 5-min keeper cycle.
+                    Agents classify <strong style={{ color: 'var(--red)' }}>CRITICAL</strong> in next keeper cycle.
                   </p>
                 </div>
                 <button className="btn btn-red" onClick={simulateAttack} disabled={attackLoading} style={{ flexShrink: 0 }}>
@@ -270,7 +287,7 @@ export default function App() {
             <div className="card">
               <div style={{ fontSize: 11, color: 'var(--cyan)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Register Contract</div>
               <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Add to Monitoring Pipeline</h3>
-              <p style={{ fontSize: 13, color: 'var(--text-sec)', marginBottom: 12 }}>Any Somnia contract address. Autonomous agents monitor every 5 minutes.</p>
+              <p style={{ fontSize: 13, color: 'var(--text-sec)', marginBottom: 12 }}>Any Somnia testnet contract address. Autonomous agents monitor every 6 hours.</p>
               <div style={{ display: 'flex', gap: 10 }}>
                 <input value={registerInput} onChange={e => setRegisterInput(e.target.value)} placeholder="0x... contract address" style={{ flex: 1 }} />
                 <button className="btn btn-purple" onClick={handleRegister}>Register</button>
@@ -293,6 +310,9 @@ export default function App() {
           </div>
         )}
 
+        {/* ⚡ FORCE AUDIT — judge-facing demo tab */}
+        {activeTab === 'force-audit' && <ForceAudit />}
+
         {activeTab === 'alerts'       && <AlertLog />}
         {activeTab === 'intel'        && (
           <div>
@@ -309,6 +329,7 @@ export default function App() {
         {activeTab === 'how-it-works' && <AgentFlowDiagram />}
       </div>
 
+      {/* ── Footer ── */}
       <footer style={{ borderTop: '1px solid var(--border)', padding: '20px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 40 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg, var(--purple-dim), var(--cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🛡️</div>
@@ -317,7 +338,7 @@ export default function App() {
         <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
           <a href="https://x.com/GopichandAI" target="_blank" rel="noreferrer" style={{ color: 'var(--text-sec)' }}>@GopichandAI</a>
           <a href="https://github.com/gopichandchalla16/somniawatch" target="_blank" rel="noreferrer" style={{ color: 'var(--text-sec)' }}>GitHub</a>
-          <a href={EXPLORER_BASE + '/address/' + SOMNIAWATCH_ADDRESS} target="_blank" rel="noreferrer" style={{ color: 'var(--purple)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{SOMNIAWATCH_ADDRESS.slice(0,14)}...</a>
+          <a href={EXPLORER_BASE + '/address/' + SOMNIAWATCH_ADDRESS} target="_blank" rel="noreferrer" style={{ color: 'var(--purple)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{SOMNIAWATCH_ADDRESS.slice(0, 14)}...</a>
         </div>
       </footer>
     </div>
