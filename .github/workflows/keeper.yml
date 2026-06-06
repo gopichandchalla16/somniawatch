@@ -2,7 +2,6 @@ name: SomniaWatch Keeper
 
 on:
   schedule:
-    # Every 6 hours: 00:00, 06:00, 12:00, 18:00 UTC
     - cron: '0 */6 * * *'
   workflow_dispatch:
     inputs:
@@ -22,70 +21,83 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Check KEEPER_CRON_URL secret
+      - name: Validate secret and trigger keeper
         shell: bash
         env:
           KEEPER_CRON_URL: ${{ secrets.KEEPER_CRON_URL }}
         run: |
+          echo "========================================="
+          echo " SomniaWatch Keeper - $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "========================================="
+
+          # --- Validate secret exists ---
           if [ -z "$KEEPER_CRON_URL" ]; then
-            echo "::error::KEEPER_CRON_URL secret is missing!"
-            echo "Go to: Repo → Settings → Secrets → Actions → Add KEEPER_CRON_URL"
-            echo "Value: your Vercel keeper-cron endpoint URL (from vercel.json crons config)"
+            echo "::error::KEEPER_CRON_URL secret is not set!"
+            echo "Fix: Go to Settings > Secrets > Actions > Add KEEPER_CRON_URL"
+            echo "Value must be: https://somniawatch-eight.vercel.app/api/keeper-cron"
             exit 1
           fi
-          echo "✅ KEEPER_CRON_URL is set"
-          # Mask the URL in logs
-          echo "::add-mask::$KEEPER_CRON_URL"
 
-      - name: Trigger Vercel Keeper Cron
-        id: trigger
-        shell: bash
-        env:
-          KEEPER_CRON_URL: ${{ secrets.KEEPER_CRON_URL }}
-        run: |
-          echo "🚀 Triggering SomniaWatch keeper at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "📡 Calling Vercel keeper endpoint..."
+          # --- Print masked URL for debug ---
+          DOMAIN=$(echo "$KEEPER_CRON_URL" | sed 's|https\?://||' | cut -d'/' -f1)
+          echo "Calling domain: $DOMAIN"
 
-          HTTP_STATUS=$(curl -s -o /tmp/keeper_response.json -w "%{http_code}" \
+          # --- DNS check before curl ---
+          if ! nslookup "$DOMAIN" > /dev/null 2>&1; then
+            echo "::error::DNS resolution failed for $DOMAIN"
+            echo "Check that KEEPER_CRON_URL is set to a valid Vercel URL"
+            exit 1
+          fi
+          echo "DNS OK for $DOMAIN"
+
+          # --- Call Vercel endpoint ---
+          echo "Triggering keeper..."
+          HTTP_STATUS=$(curl -s \
+            -o /tmp/resp.json \
+            -w "%{http_code}" \
+            --max-time 540 \
+            --connect-timeout 30 \
             -X GET \
-            -H "Content-Type: application/json" \
-            --max-time 300 \
-            --retry 3 \
-            --retry-delay 10 \
-            --retry-connrefused \
-            "$KEEPER_CRON_URL")
+            -H "Accept: application/json" \
+            "$KEEPER_CRON_URL" 2>/tmp/curl_err.txt)
 
-          echo "📊 HTTP Status: $HTTP_STATUS"
-          echo "📄 Response:"
-          cat /tmp/keeper_response.json 2>/dev/null || echo "(no response body)"
-          echo ""
+          CURL_EXIT=$?
+          echo "Curl exit code: $CURL_EXIT"
+          echo "HTTP Status: $HTTP_STATUS"
 
-          # Accept 200 and 202 as success
-          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 202 ]; then
-            echo "✅ Keeper triggered successfully (HTTP $HTTP_STATUS)"
-            echo "status=success" >> $GITHUB_OUTPUT
-          elif [ "$HTTP_STATUS" -eq 429 ]; then
-            echo "::warning::Rate limited by Vercel (HTTP 429) — skipping this cycle"
-            echo "status=rate_limited" >> $GITHUB_OUTPUT
-            exit 0
-          elif [ "$HTTP_STATUS" -eq 0 ]; then
-            echo "::error::Could not reach Vercel endpoint — check your deployment is live"
-            echo "status=unreachable" >> $GITHUB_OUTPUT
-            exit 1
-          else
-            echo "::error::Keeper returned HTTP $HTTP_STATUS"
-            echo "status=failed" >> $GITHUB_OUTPUT
+          # Show curl error if any
+          if [ -s /tmp/curl_err.txt ]; then
+            echo "Curl stderr:"
+            cat /tmp/curl_err.txt
+          fi
+
+          # Show response body
+          echo "--- Response body ---"
+          cat /tmp/resp.json 2>/dev/null | head -100 || echo "(empty)"
+          echo "--- End response ---"
+
+          # Handle curl errors
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "::error::curl failed with exit code $CURL_EXIT"
+            echo "Exit code meanings: 6=DNS fail, 7=connect fail, 28=timeout, 35=SSL fail"
             exit 1
           fi
 
-      - name: Report run summary
-        if: always()
-        shell: bash
-        run: |
-          echo "======================================================"
-          echo "  SomniaWatch Keeper — Run Report"
-          echo "  Time     : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "  Outcome  : ${{ steps.trigger.outcome }}"
-          echo "  Status   : ${{ steps.trigger.outputs.status }}"
-          echo "  Next run : $(date -u -d '+6 hours' '+%Y-%m-%d %H:%M UTC' 2>/dev/null || date -u '+next scheduled run')"
-          echo "======================================================"
+          # Handle HTTP status
+          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 202 ]; then
+            echo "SUCCESS: Keeper ran (HTTP $HTTP_STATUS)"
+          elif [ "$HTTP_STATUS" -eq 500 ]; then
+            echo "::warning::Keeper returned HTTP 500 - Vercel function error (contract or env var issue)"
+            echo "Check: PRIVATE_KEY and SOMNIAWATCH_ADDRESS set in Vercel env vars"
+            exit 1
+          elif [ "$HTTP_STATUS" -eq 429 ]; then
+            echo "::warning::Rate limited (HTTP 429) - skipping this cycle"
+            exit 0
+          else
+            echo "::error::Unexpected HTTP $HTTP_STATUS"
+            exit 1
+          fi
+
+          echo "========================================="
+          echo " Keeper complete!"
+          echo "========================================="
