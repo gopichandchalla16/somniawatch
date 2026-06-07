@@ -5,6 +5,7 @@ import CertificateGallery from './components/CertificateGallery';
 import Leaderboard from './components/Leaderboard';
 import AgentFlowDiagram from './components/AgentFlowDiagram';
 import AlertLog from './components/AlertLog';
+import AlertCenter from './components/AlertCenter';
 import ThreatIntelCard from './components/ThreatIntelCard';
 import AgentExplorer from './components/AgentExplorer';
 import AgentPlayground from './components/AgentPlayground';
@@ -141,15 +142,16 @@ export default function App() {
   };
 
   const tabs = [
-    { id: 'dashboard',    label: '📡 Dashboard'        },
-    { id: 'force-audit',  label: '⚡ Force Audit'       },
-    { id: 'alerts',       label: '🔔 Alert Log'         },
-    { id: 'intel',        label: '🔍 Threat Intel'      },
-    { id: 'agents',       label: '🤖 Agent Explorer'    },
-    { id: 'playground',   label: '🧪 Playground'        },
-    { id: 'certificates', label: '🏅 Certificates'      },
-    { id: 'leaderboard',  label: '🏆 Leaderboard'       },
-    { id: 'how-it-works', label: '⚙️ How It Works'      },
+    { id: 'dashboard',     label: '📡 Dashboard'        },
+    { id: 'force-audit',   label: '⚡ Force Audit',   glow: true },
+    { id: 'alert-center',  label: '🔔 Alert Center',   glow: true },
+    { id: 'alerts',        label: '📜 Alert Log'         },
+    { id: 'intel',         label: '🔍 Threat Intel'      },
+    { id: 'agents',        label: '🤖 Agent Explorer'    },
+    { id: 'playground',    label: '🧪 Playground'        },
+    { id: 'certificates',  label: '🏅 Certificates'      },
+    { id: 'leaderboard',   label: '🏆 Leaderboard'       },
+    { id: 'how-it-works',  label: '⚙️ How It Works'      },
   ];
 
   const isConfirmed = attackStatus.startsWith('CONFIRMED');
@@ -213,7 +215,7 @@ export default function App() {
             {' '}smart contract guardian
           </h1>
           <p style={{ color: 'var(--text-sec)', maxWidth: 520, margin: '0 auto 32px', fontSize: 16, lineHeight: 1.7 }}>
-            3-agent pipeline · JSON API + LLM Inference + LLM Parse Website · validator consensus · immutable on-chain receipts
+            3-agent pipeline · fetchString + inferString(Qwen3-30B) + Sphinx Protocol · 3-validator consensus · immutable on-chain receipts
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn-purple" style={{ padding: '12px 32px', fontSize: 15 }} onClick={connectWallet}>Connect Wallet to Start</button>
@@ -232,11 +234,10 @@ export default function App() {
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
             padding: '14px 16px', background: 'none', border: 'none', whiteSpace: 'nowrap',
             borderBottom: activeTab === t.id ? '2px solid var(--purple)' : '2px solid transparent',
-            color: activeTab === t.id ? 'var(--purple)' : 'var(--text-dim)',
-            cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 500,
+            color: activeTab === t.id ? 'var(--purple)' : t.glow ? '#6366f1' : 'var(--text-dim)',
+            cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13,
+            fontWeight: t.glow ? 700 : 500,
             transition: 'color 0.2s',
-            // highlight the Force Audit tab with a glow so judges notice it
-            ...(t.id === 'force-audit' ? { color: activeTab === 'force-audit' ? '#a5b4fc' : '#6366f1', fontWeight: 700 } : {}),
           }}>{t.label}</button>
         ))}
       </div>
@@ -247,27 +248,24 @@ export default function App() {
         {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div>
-            {/* Judge quick-action banner */}
             <div style={{ background: 'linear-gradient(135deg,#1e1b4b,#0f172a)', border: '1px solid #6366f1', borderRadius: 12, padding: '14px 20px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
               <div>
                 <span style={{ fontSize: 13, color: '#a5b4fc', fontWeight: 700 }}>👋 Judge? Start here →</span>
                 <span style={{ fontSize: 12, color: '#64748b', marginLeft: 10 }}>No wallet needed for the live audit demo</span>
               </div>
-              <button
-                className="btn btn-purple"
-                style={{ fontSize: 12, padding: '8px 20px' }}
-                onClick={() => setActiveTab('force-audit')}
-              >⚡ Run Instant Audit</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-purple" style={{ fontSize: 12, padding: '8px 20px' }} onClick={() => setActiveTab('force-audit')}>⚡ Run Instant Audit</button>
+                <button className="btn btn-ghost"  style={{ fontSize: 12, padding: '8px 20px' }} onClick={() => setActiveTab('alert-center')}>🔔 Test Alerts</button>
+              </div>
             </div>
 
-            {/* Attack Simulator */}
             <div className="card" style={{ borderColor: '#f43f5e44', background: 'linear-gradient(135deg, #0c0c14, #140a0a)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--red)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Attack Simulator</div>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>One-Click MockVault Exploit</h3>
                   <p style={{ fontSize: 13, color: 'var(--text-sec)', maxWidth: 500 }}>
-                    Calls <code className="mono" style={{ color: 'var(--purple)', fontSize: 12 }}>batchWithdraw(0.001 STT × 5)</code> — auto-deposits if needed.
+                    Calls <code style={{ color: 'var(--purple)', fontSize: 12, fontFamily: 'var(--font-mono)' }}>batchWithdraw(0.001 STT × 5)</code> — auto-deposits if needed.
                     Agents classify <strong style={{ color: 'var(--red)' }}>CRITICAL</strong> in next keeper cycle.
                   </p>
                 </div>
@@ -283,7 +281,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Register */}
             <div className="card">
               <div style={{ fontSize: 11, color: 'var(--cyan)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Register Contract</div>
               <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Add to Monitoring Pipeline</h3>
@@ -295,13 +292,12 @@ export default function App() {
               {registerStatus && <p style={{ marginTop: 8, fontSize: 12, color: registerStatus.startsWith('Error') ? 'var(--red)' : 'var(--green)' }}>{registerStatus}</p>}
             </div>
 
-            {/* Monitored list */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>Monitored Contracts</div>
               {contracts.map(addr => (
                 <div key={addr} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 6 }}>
-                  <code className="mono" style={{ fontSize: 12, color: 'var(--text-primary)' }}>{addr}</code>
-                  <a href={EXPLORER_BASE + '/address/' + addr} target="_blank" rel="noreferrer" className="text-cyan" style={{ fontSize: 12 }}>Explorer ↗</a>
+                  <code style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{addr}</code>
+                  <a href={EXPLORER_BASE + '/address/' + addr} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--cyan)' }}>Explorer ↗</a>
                 </div>
               ))}
             </div>
@@ -310,9 +306,8 @@ export default function App() {
           </div>
         )}
 
-        {/* ⚡ FORCE AUDIT — judge-facing demo tab */}
-        {activeTab === 'force-audit' && <ForceAudit />}
-
+        {activeTab === 'force-audit'  && <ForceAudit />}
+        {activeTab === 'alert-center' && <AlertCenter />}
         {activeTab === 'alerts'       && <AlertLog />}
         {activeTab === 'intel'        && (
           <div>
@@ -329,14 +324,12 @@ export default function App() {
         {activeTab === 'how-it-works' && <AgentFlowDiagram />}
       </div>
 
-      {/* ── Footer ── */}
       <footer style={{ borderTop: '1px solid var(--border)', padding: '20px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 40 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg, var(--purple-dim), var(--cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🛡️</div>
           <span style={{ fontSize: 13, color: 'var(--text-sec)' }}>SomniaWatch · Somnia Agentathon 2026</span>
         </div>
         <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
-          <a href="https://x.com/GopichandAI" target="_blank" rel="noreferrer" style={{ color: 'var(--text-sec)' }}>@GopichandAI</a>
           <a href="https://github.com/gopichandchalla16/somniawatch" target="_blank" rel="noreferrer" style={{ color: 'var(--text-sec)' }}>GitHub</a>
           <a href={EXPLORER_BASE + '/address/' + SOMNIAWATCH_ADDRESS} target="_blank" rel="noreferrer" style={{ color: 'var(--purple)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{SOMNIAWATCH_ADDRESS.slice(0, 14)}...</a>
         </div>
