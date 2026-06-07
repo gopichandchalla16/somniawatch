@@ -16,11 +16,21 @@ module.exports = {
     },
   },
   networks: {
+    // Primary name used everywhere
+    somnia: {
+      url:      process.env.SOMNIA_RPC || "https://dream-rpc.somnia.network",
+      chainId:  50312,
+      accounts: accounts,
+      gasPrice: "auto",
+      timeout:  120000,
+    },
+    // Alias — kept for backward compatibility with older scripts
     somnia_testnet: {
       url:      process.env.SOMNIA_RPC || "https://dream-rpc.somnia.network",
       chainId:  50312,
       accounts: accounts,
       gasPrice: "auto",
+      timeout:  120000,
     },
   },
 };
