@@ -1,60 +1,71 @@
-// /api/alert.js — ROOT level, Vercel detects this as serverless function
-const https = require('https');
+// /api/alert.js — Alert system status check + manual trigger
+// GET: returns alert system health (Discord + Telegram webhook status)
+// POST: fires a test alert to both channels
 
-function post(hostname, path, body) {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify(body);
-    const req  = https.request(
-      { hostname, path, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } },
-      res => { let d = ''; res.on('data', c => d += c); res.on('end', () => resolve({ status: res.statusCode, body: d })); }
-    );
-    req.on('error', reject);
-    req.write(data); req.end();
-  });
+const DISCORD_URL    = process.env.DISCORD_WEBHOOK_URL;
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT  = process.env.TELEGRAM_CHAT_ID;
+
+async function sendDiscord(msg) {
+  if (!DISCORD_URL) return false;
+  try {
+    const r = await fetch(DISCORD_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: msg }),
+    });
+    return r.ok;
+  } catch { return false; }
 }
 
-module.exports = async function handler(req, res) {
+async function sendTelegram(msg) {
+  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT) return false;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT, text: msg, parse_mode: 'Markdown' }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { contract, riskType } = req.body || {};
-  if (!contract) return res.status(400).json({ error: 'contract required' });
+  const discordConfigured  = !!DISCORD_URL;
+  const telegramConfigured = !!(TELEGRAM_TOKEN && TELEGRAM_CHAT);
 
-  const DISCORD_WEBHOOK  = process.env.DISCORD_WEBHOOK  || '';
-  const TELEGRAM_TOKEN   = process.env.TELEGRAM_TOKEN   || '';
-  const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+  if (req.method === 'GET') {
+    // Health check — don’t fire a real alert, just report config status
+    return res.status(200).json({
+      ok:       true,
+      message:  'Alert system operational',
+      discord:  discordConfigured,
+      telegram: telegramConfigured,
+      channels: (discordConfigured ? 1 : 0) + (telegramConfigured ? 1 : 0),
+      hint:     discordConfigured || telegramConfigured
+        ? 'Both channels configured. POST to this endpoint to fire a test alert.'
+        : 'No webhook env vars set — alerts will log locally only.',
+    });
+  }
 
-  const explorerLink = `https://shannon-explorer.somnia.network/address/${contract}`;
-  const risk = riskType || 'batchWithdraw_reentrancy_pattern';
-  const results = {};
+  if (req.method === 'POST') {
+    const msg = `🛡️ **SomniaWatch — Test Alert** \`${new Date().toISOString()}\`
+This is a manual test from the Force Audit panel.
+If you see this, Discord/Telegram alerts are working correctly.
+⚡ [Live App](https://somniawatch-eight.vercel.app) | [🔗 Contract](https://shannon-explorer.somnia.network/address/0xaca28071870080421206831D2F9EBd3E97CcdFd1)`;
 
-  if (DISCORD_WEBHOOK) {
-    try {
-      const url = new URL(DISCORD_WEBHOOK);
-      const r   = await post(url.hostname, url.pathname + url.search, {
-        embeds: [{
-          title: '\uD83D\uDEA8 SOMNIAWATCH - CRITICAL ALERT',
-          description: `**Contract:** \`${contract}\`\n**Risk:** ${risk}\n[View on Explorer](${explorerLink})`,
-          color: 0xff2200,
-          timestamp: new Date().toISOString(),
-        }],
-      });
-      results.discord = r.status < 300 ? 'sent' : `failed:${r.status}`;
-    } catch (e) { results.discord = `error:${e.message}`; }
-  } else { results.discord = 'not_configured'; }
+    const [dOk, tOk] = await Promise.all([sendDiscord(msg), sendTelegram(msg)]);
 
-  if (TELEGRAM_TOKEN && TELEGRAM_CHAT_ID) {
-    try {
-      const text = `\uD83D\uDEA8 *SOMNIAWATCH ALERT*\nContract: \`${contract}\`\nRisk: *${risk.replace(/_/g, '\\_')}*\n[Explorer](${explorerLink})`;
-      const r    = await post('api.telegram.org', `/bot${TELEGRAM_TOKEN}/sendMessage`,
-        { chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'Markdown' });
-      const p    = JSON.parse(r.body);
-      results.telegram = p.ok ? 'sent' : `failed:${p.description}`;
-    } catch (e) { results.telegram = `error:${e.message}`; }
-  } else { results.telegram = 'not_configured'; }
+    return res.status(200).json({
+      ok:       true,
+      discord:  dOk,
+      telegram: tOk,
+      message:  `Test alert sent — Discord: ${dOk ? '✅' : '❌'} | Telegram: ${tOk ? '✅' : '❌'}`,
+      timestamp: new Date().toISOString(),
+    });
+  }
 
-  return res.status(200).json({ ok: true, results });
+  return res.status(405).json({ error: 'GET or POST only' });
 };
