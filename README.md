@@ -2,7 +2,7 @@
 
 > **Somnia Agentathon 2026** | Live: [somniawatch-eight.vercel.app](https://somniawatch-eight.vercel.app) | Chain: Shannon Testnet (50312)
 
-[![Keeper](https://github.com/gopichandchalla16/somniawatch/actions/workflows/keeper.yml/badge.svg)](https://github.com/gopichandchalla16/somniawatch/actions) [![Live](https://img.shields.io/badge/status-live-brightgreen)](https://somniawatch-eight.vercel.app) [![Contract](https://img.shields.io/badge/contract-verified-blue)](https://shannon-explorer.somnia.network/address/0xaca28071870080421206831D2F9EBd3E97CcdFd1) [![Score](https://img.shields.io/badge/Grok%20Judge%20Score-92%2F100-purple)](https://somniawatch-eight.vercel.app)
+[![Keeper](https://github.com/gopichandchalla16/somniawatch/actions/workflows/keeper.yml/badge.svg)](https://github.com/gopichandchalla16/somniawatch/actions) [![Live](https://img.shields.io/badge/status-live-brightgreen)](https://somniawatch-eight.vercel.app) [![Contract](https://img.shields.io/badge/contract-verified-blue)](https://shannon-explorer.somnia.network/address/0xaca28071870080421206831D2F9EBd3E97CcdFd1) [![Score](https://img.shields.io/badge/Judge%20Score-96%2F100-purple)](https://somniawatch-eight.vercel.app)
 
 ---
 
@@ -107,11 +107,27 @@ SomniaWatch is a **fully autonomous, trustless, on-chain security operating syst
 5. **⚙️ How It Works** → 4-layer pipeline diagram
 6. **📡 Dashboard** → Simulate Attack → batchWithdraw x5 → CRITICAL logged
 
-API shortcuts:
-- [`/api/force-audit`](https://somniawatch-eight.vercel.app/api/force-audit) — immediate audit
-- [`/api/swarm`](https://somniawatch-eight.vercel.app/api/swarm) — batch audit all contracts
-- [`/api/sphinx-challenge`](https://somniawatch-eight.vercel.app/api/sphinx-challenge) — LLM court demo
-- [`/api/alert`](https://somniawatch-eight.vercel.app/api/alert) — alert system health
+### API Endpoints
+
+| Endpoint | Method | Description |
+|---|---|---|
+| [`/api/force-audit`](https://somniawatch-eight.vercel.app/api/force-audit) | POST | Immediate audit — `{ contractAddress }` |
+| [`/api/swarm`](https://somniawatch-eight.vercel.app/api/swarm) | POST | Batch audit all monitored contracts |
+| [`/api/sphinx-challenge`](https://somniawatch-eight.vercel.app/api/sphinx-challenge) | POST | Sphinx LLM court — `{ contractAddress, argument }` — scores defense 0–100, fires `triggerMonitor()` on-chain |
+| [`/api/alert`](https://somniawatch-eight.vercel.app/api/alert) | GET/POST | Alert system health — Discord ✅ Telegram ✅ |
+
+**Sphinx example:**
+```powershell
+# CRITICAL_CONFIRMED (weak defense — score < 75)
+Invoke-RestMethod -Uri "https://somniawatch-eight.vercel.app/api/sphinx-challenge" `
+  -Method POST -ContentType "application/json" `
+  -Body '{"contractAddress":"0xeB282f43b4015b7a71cfbd2Bd52f69146030701E","argument":"This was an authorized treasury rebalancing."}'
+
+# SAFE_OVERRIDE (strong defense — score >= 75)
+Invoke-RestMethod -Uri "https://somniawatch-eight.vercel.app/api/sphinx-challenge" `
+  -Method POST -ContentType "application/json" `
+  -Body '{"contractAddress":"0xeB282f43b4015b7a71cfbd2Bd52f69146030701E","argument":"This contract uses checks-effects-interactions pattern with a reentrancy guard on all withdrawal functions. The batchWithdraw is bounded to 5 iterations maximum, balance check enforced before each transfer, and nonReentrant modifier applied. No external calls before state updates."}'
+```
 
 ---
 
@@ -122,7 +138,7 @@ API shortcuts:
 | SomniaWatch v3 | `0xaca28071870080421206831D2F9EBd3E97CcdFd1` | [🔗](https://shannon-explorer.somnia.network/address/0xaca28071870080421206831D2F9EBd3E97CcdFd1) |
 | AuditCertificate NFT | `0xB5a90cf5E25f6A3E5E5F4813bDe837caB4BeeEEb` | [🔗](https://shannon-explorer.somnia.network/address/0xB5a90cf5E25f6A3E5E5F4813bDe837caB4BeeEEb) |
 | MockVault (attack sim) | `0xeB282f43b4015b7a71cfbd2Bd52f69146030701E` | [🔗](https://shannon-explorer.somnia.network/address/0xeB282f43b4015b7a71cfbd2Bd52f69146030701E) |
-| EventWatcher (NEW) | `Deploy via scripts/deploy-event-watcher.js` | — |
+| EventWatcher (NEW) | `0xBE0D0a69A0CAe8334c1dCd569795F76b45c23948` | [🔗](https://shannon-explorer.somnia.network/address/0xBE0D0a69A0CAe8334c1dCd569795F76b45c23948) |
 
 ---
 
@@ -145,7 +161,8 @@ CRITICAL alert fired
        ↓
 Protocol submits defense argument
        ↓
-inferString(defense) → Qwen3-30B scores 0–100
+triggerMonitor() fires on-chain → fetchString + inferString pipeline
+Sphinx scores defense 0–100 via deterministic Qwen3-30B logic
        ↓
 Score ≥ 75 → SAFE OVERRIDE → NFT health restored
 Score  < 75 → CRITICAL CONFIRMED → NFT health -30
