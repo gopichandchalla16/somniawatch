@@ -26,9 +26,42 @@
 | vs Chainlink Functions | **375× cheaper** | vs $15/call |
 | Alert response time | **< 5 minutes** | Discord ✅ Telegram ✅ |
 | Force Audit latency | **< 400ms** | Live API |
-| Sphinx LLM court | **World’s first on-chain** | No human moderator |
+| Sphinx LLM court | **World's first on-chain** | No human moderator |
 | Contracts monitored | **Unlimited** | Any Somnia address |
 | EventWatcher | **Auto-registers threats** | No human trigger |
+
+---
+
+## 🎬 Demo Video
+
+> **Watch SomniaWatch in action — 3-agent pipeline, Sphinx Protocol, and live alerts firing in real time.**
+
+[![SomniaWatch Demo Video](https://img.shields.io/badge/▶%20Watch%20Demo-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/PASTE_YOUR_VIDEO_ID_HERE)
+
+### What the demo covers (5 minutes):
+
+| Timestamp | Feature Demonstrated |
+|---|---|
+| `0:00 – 0:30` | App overview — 8 tabs, live dashboard |
+| `0:30 – 1:00` | **Simulate Attack** — batchWithdraw reentrancy on MockVault |
+| `1:00 – 1:45` | **Force Audit** — CRITICAL classification in < 400ms |
+| `1:45 – 2:30` | **Alerts** — Discord + Telegram firing live |
+| `2:30 – 3:15` | **Sphinx Protocol** — weak defense → score 36 → CRITICAL_CONFIRMED |
+| `3:15 – 4:00` | **Sphinx Protocol** — strong defense → score 100 → SAFE_OVERRIDE |
+| `4:00 – 4:30` | **NFT Certs** — Gold Guardian speaks via inferString() |
+| `4:30 – 5:00` | **API Demo** — copy-paste curl commands, verified JSON outputs |
+
+---
+
+## 📑 Submission Links
+
+| Resource | Link |
+|---|---|
+| 🌐 **Live App** | [somniawatch-eight.vercel.app](https://somniawatch-eight.vercel.app) |
+| 💻 **GitHub** | [gopichandchalla16/somniawatch](https://github.com/gopichandchalla16/somniawatch) |
+| 📊 **Presentation Deck** | [Google Slides](https://docs.google.com/presentation/d/117LWxRCtrdYvP9OCRISmsDulBafthzEQ/edit?usp=sharing) |
+| 🎬 **Demo Video** | [YouTube — Coming Soon](https://youtu.be/PASTE_YOUR_VIDEO_ID_HERE) |
+| 🔗 **Main Contract** | [Shannon Explorer](https://shannon-explorer.somnia.network/address/0xaca28071870080421206831D2F9EBd3E97CcdFd1) |
 
 ---
 
@@ -53,7 +86,7 @@ Existing tools all fail the same way:
 
 ## ⚡ The Solution
 
-SomniaWatch is a **fully autonomous smart contract security guardian** built natively on Somnia’s Agentic L1. It chains all three Somnia Agent types to fetch, reason, and classify contract risk every 5 minutes — with no human in the loop.
+SomniaWatch is a **fully autonomous smart contract security guardian** built natively on Somnia's Agentic L1. It chains all three Somnia Agent types to fetch, reason, and classify contract risk every 5 minutes — with no human in the loop.
 
 ```
 Every 5 minutes, autonomously:
@@ -182,7 +215,6 @@ Invoke-RestMethod -Uri "https://somniawatch-eight.vercel.app/api/sphinx-challeng
   "overridden": false,
   "threshold": 75,
   "outcome": "Score 36 < 75 — defense REJECTED. CRITICAL status confirmed by Sphinx Protocol.",
-  "explorerLink": "https://shannon-explorer.somnia.network/address/0xeB282f43b4015b7a71cfbd2Bd52f69146030701E",
   "sphinxPrimitive": "inferString(Qwen3-30B, allowedValues:[\"0\"...\"100\"])",
   "validators": 3,
   "costSTT": "0.25"
@@ -207,7 +239,6 @@ Invoke-RestMethod -Uri "https://somniawatch-eight.vercel.app/api/sphinx-challeng
   "overridden": true,
   "threshold": 75,
   "outcome": "Score 100 >= 75 — defense ACCEPTED. SAFE_OVERRIDE applied. NFT health will be restored.",
-  "explorerLink": "https://shannon-explorer.somnia.network/address/0xeB282f43b4015b7a71cfbd2Bd52f69146030701E",
   "sphinxPrimitive": "inferString(Qwen3-30B, allowedValues:[\"0\"...\"100\"])",
   "validators": 3,
   "costSTT": "0.25"
@@ -256,7 +287,7 @@ Audits all monitored contracts in parallel in a single call. Returns risk labels
 
 ---
 
-## 🏛️ Sphinx Protocol — World’s First Trustless On-Chain LLM Court
+## 🏛️ Sphinx Protocol — World's First Trustless On-Chain LLM Court
 
 ```
 Step 1:  CRITICAL alert fires → Discord + Telegram notify protocol team
@@ -270,13 +301,9 @@ No human moderator. No DAO vote. No centralized oracle.
 Pure on-chain AI justice. Immutable verdict.
 ```
 
-**Why this matters:** Every false positive in existing security systems requires a human moderator or DAO governance vote — which takes hours to days. Sphinx resolves it in under 30 seconds with a cryptographically verifiable result.
-
 ---
 
 ## 🌟 Tamagotchi Guardian — Living NFT Security Certificates
-
-SomniaWatch issues **ERC-721 NFT certificates** that evolve based on real security performance:
 
 | Tier | Requirement | Meaning |
 |---|---|---|
@@ -298,8 +325,7 @@ SomniaWatch issues **ERC-721 NFT certificates** that evolve based on real securi
 | **Pro** | $49/mo | 50 | Keeper, NFT certs, Swarm, Webhooks, Sphinx |
 | **Enterprise** | Custom | Unlimited | Custom agents, SLA, white-label, priority support |
 
-**TAM: $2.3B smart contract security market**
-**SAM: 50,000+ active DeFi protocols globally**
+**TAM: $2.3B smart contract security market · SAM: 50,000+ active DeFi protocols**
 **At $49/mo Pro × 1,000 protocols = $588K ARR with zero marginal cost increase**
 
 ---
@@ -371,8 +397,8 @@ MOCK_VAULT_ADDRESS=        # MockVault contract address
 [![GitHub](https://img.shields.io/badge/GitHub-gopichandchalla16-333?style=flat-square&logo=github)](https://github.com/gopichandchalla16)
 [![Live](https://img.shields.io/badge/Live%20App-somniawatch--eight.vercel.app-6366f1?style=flat-square)](https://somniawatch-eight.vercel.app)
 
-> *“SomniaWatch proves that Agentic L1 is not a buzzword — it is a new primitive.*
-> *The Sphinx Protocol, EventWatcher, and 3-agent pipeline are impossible on any other chain today.”*
+> *"SomniaWatch proves that Agentic L1 is not a buzzword — it is a new primitive.*
+> *The Sphinx Protocol, EventWatcher, and 3-agent pipeline are impossible on any other chain today."*
 
 </div>
 
@@ -382,6 +408,6 @@ MOCK_VAULT_ADDRESS=        # MockVault contract address
 
 *Built for Somnia Agentathon 2026 · Encode Club · May 20 – June 10, 2026*
 
-**“Every CRITICAL alert is a story. SomniaWatch reads them all.”**
+**"Every CRITICAL alert is a story. SomniaWatch reads them all."**
 
 </div>
